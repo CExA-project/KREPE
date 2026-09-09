@@ -1,4 +1,5 @@
 add_library(kernel_extractor)
+set_target_properties(kernel_extractor PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_sources(
   kernel_extractor
   PRIVATE kernel_extractor.cpp
