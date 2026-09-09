@@ -3,11 +3,14 @@
 #include <cassert>
 #include <cstdlib>
 #include <cstring>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
-#include <unordered_set>
+#include <string_view>
+#include <utility>
+#include <vector>
 #include <variant>
 #include <tuple>
 #include <Kokkos_Core.hpp>
@@ -15,6 +18,21 @@
 #include <krepe/common/extended_lambda_utils.hpp>
 
 namespace krepe {
+
+// Non-owning description of an allocation in the active replay. The pointers
+// remain valid until its ScopeGuard is destroyed. A null reference can describe
+// a valid empty buffer, use has_reference to test availability.
+struct ReplayAllocation {
+  std::string label;
+  std::string memory_space;
+  void* data                       = nullptr;
+  std::size_t size_bytes           = 0;
+  const void* reference_data       = nullptr;
+  std::size_t reference_size_bytes = 0;
+  bool has_input                   = false;
+  bool has_reference               = false;
+};
+
 namespace impl {
 
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
@@ -31,6 +49,19 @@ void* get_out_allocation(impl::MemorySpaceType memory_space,
                          const std::string& label);
 bool has_out_allocation(impl::MemorySpaceType memory_space,
                         const std::string& label);
+
+struct SnapshotAllocation;
+struct StoredAllocation {
+  char* captured_allocation;
+  ReplayAllocation descriptor;
+  bool output_seen = false;
+  std::unique_ptr<void, void (*)(void*)> reference{nullptr, nullptr};
+};
+
+std::vector<ReplayAllocation> get_allocations(
+    MemorySpaceType memory_space, std::optional<std::string_view> label);
+void validate_comparison(const ReplayAllocation& allocation,
+                         MemorySpaceType memory_space);
 
 template <class T>
 struct add_unmanaged_trait;
@@ -374,24 +405,16 @@ struct ParallelForVisitor {
 
 class ScopeGuard {
  private:
+  std::vector<impl::StoredAllocation> replay_allocations;
   std::vector<impl::Allocation> host_raw_allocations;
-  std::unordered_map<std::string, void*> host_allocations;
-  std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>
-      host_output_allocations;
-  std::unordered_set<std::string> host_output_labels;
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
   std::vector<impl::Allocation> device_raw_allocations;
-  std::unordered_map<std::string, void*> device_allocations;
-  std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>
-      device_output_allocations;
-  std::unordered_set<std::string> device_output_labels;
 #endif
 
   void allocate(impl::MemorySpaceType memory_space, char* address,
                 std::size_t size);
 
-  void allocate_output(std::string label, std::string_view memory_space,
-                       char* data, std::size_t size);
+  void allocate_output(const impl::SnapshotAllocation& snapshot, char* data);
 
  public:
   ScopeGuard(int& argc, char* argv[]);
@@ -468,6 +491,65 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
       std::tuple_cat(std::forward_as_tuple(ref_data), args));
 
   f(expected, actual);
+}
+
+// Enumerate all matching input/output records, duplicate labels remain
+// separate descriptors. Enumeration order is unspecified.
+template <class MemorySpace>
+std::vector<ReplayAllocation> get_allocations(const std::string& label) {
+  return impl::get_allocations(
+      impl::memory_space_type_from_string(MemorySpace::name()), label);
+}
+
+template <class MemorySpace>
+std::vector<ReplayAllocation> get_allocations() {
+  return impl::get_allocations(
+      impl::memory_space_type_from_string(MemorySpace::name()), std::nullopt);
+}
+
+// Explicit dimensions/layout for structured comparisons. The caller must
+// synchronize the replay kernel before inspecting its results.
+template <class DataType, class... Properties, class Tuple, class Functor>
+decltype(auto) compare_views(const ReplayAllocation& allocation, Tuple args,
+                             Functor&& f) {
+  using View         = Kokkos::View<DataType, Properties...>;
+  using memory_space = typename View::memory_space;
+  using value_type   = typename View::non_const_value_type;
+  impl::validate_comparison(
+      allocation, impl::memory_space_type_from_string(memory_space::name()));
+
+  using ViewType = Kokkos::View<
+      typename View::data_type, typename View::array_layout, memory_space,
+      typename impl::add_unmanaged_trait<typename View::memory_traits>::type>;
+  using ReferenceView = typename ViewType::const_type;
+  ViewType actual     = std::make_from_tuple<ViewType>(std::tuple_cat(
+      std::make_tuple(static_cast<value_type*>(allocation.data)), args));
+  if (actual.span() > allocation.size_bytes / sizeof(value_type)) {
+    throw std::runtime_error("Requested view exceeds allocation '" +
+                             allocation.label + "'");
+  }
+  ReferenceView expected = std::make_from_tuple<ReferenceView>(std::tuple_cat(
+      std::make_tuple(
+          static_cast<const value_type*>(allocation.reference_data)),
+      args));
+  return std::invoke(std::forward<Functor>(f), expected, actual);
+}
+
+// Infer a flat array's extent from the recorded byte count, including padding.
+template <class DataType, class... Properties, class Functor>
+decltype(auto) compare_views(const ReplayAllocation& allocation, Functor&& f) {
+  using View = Kokkos::View<DataType, Properties...>;
+  static_assert(View::rank == 1 && View::rank_dynamic == 1,
+                "Inferred comparison requires a one-dimensional View with a "
+                "dynamic extent");
+  using value_type = typename View::non_const_value_type;
+  if (allocation.size_bytes % sizeof(value_type) != 0) {
+    throw std::runtime_error("Incompatible byte counts for allocation '" +
+                             allocation.label + "'");
+  }
+  return compare_views<DataType, Properties...>(
+      allocation, std::make_tuple(allocation.size_bytes / sizeof(value_type)),
+      std::forward<Functor>(f));
 }
 
 template <class Functor>
