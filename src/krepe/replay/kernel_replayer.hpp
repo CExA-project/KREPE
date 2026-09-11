@@ -60,8 +60,10 @@ struct StoredAllocation {
 
 std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label);
+std::vector<ReplayAllocation> get_allocations(
+    std::string_view memory_space, std::optional<std::string_view> label);
 void validate_comparison(const ReplayAllocation& allocation,
-                         MemorySpaceType memory_space);
+                         std::string_view memory_space);
 
 template <class T>
 struct add_unmanaged_trait;
@@ -493,30 +495,28 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
   f(expected, actual);
 }
 
-// Enumerate all matching input/output records, duplicate labels remain
-// separate descriptors. Enumeration order is unspecified.
+// Enumerate records in the exact captured memory space. Duplicate labels
+// remain separate descriptors. Enumeration order is unspecified.
 template <class MemorySpace>
 std::vector<ReplayAllocation> get_allocations(const std::string& label) {
-  return impl::get_allocations(
-      impl::memory_space_type_from_string(MemorySpace::name()), label);
+  return impl::get_allocations(MemorySpace::name(), label);
 }
 
 template <class MemorySpace>
 std::vector<ReplayAllocation> get_allocations() {
-  return impl::get_allocations(
-      impl::memory_space_type_from_string(MemorySpace::name()), std::nullopt);
+  return impl::get_allocations(MemorySpace::name(), std::nullopt);
 }
 
 // Explicit dimensions/layout for structured comparisons. The caller must
-// synchronize the replay kernel before inspecting its results.
+// synchronize the replay kernel before inspecting its results. Non-host
+// captures are restored in CudaSpace/HIPSpace, including managed/pinned data.
 template <class DataType, class... Properties, class Tuple, class Functor>
 decltype(auto) compare_views(const ReplayAllocation& allocation, Tuple args,
                              Functor&& f) {
   using View         = Kokkos::View<DataType, Properties...>;
   using memory_space = typename View::memory_space;
   using value_type   = typename View::non_const_value_type;
-  impl::validate_comparison(
-      allocation, impl::memory_space_type_from_string(memory_space::name()));
+  impl::validate_comparison(allocation, memory_space::name());
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,

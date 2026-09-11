@@ -143,6 +143,16 @@ std::vector<ReplayAllocation> get_allocations(
   return result;
 }
 
+std::vector<ReplayAllocation> get_allocations(
+    std::string_view memory_space, std::optional<std::string_view> label) {
+  auto allocations =
+      get_allocations(memory_space_type_from_string(memory_space), label);
+  std::erase_if(allocations, [memory_space](const auto& allocation) {
+    return allocation.memory_space != memory_space;
+  });
+  return allocations;
+}
+
 static std::optional<ReplayAllocation> get_unique_allocation(
     MemorySpaceType memory_space, const std::string& label) {
   const auto allocations = get_allocations(memory_space, label);
@@ -174,7 +184,7 @@ bool has_out_allocation(MemorySpaceType memory_space,
 }
 
 void validate_comparison(const ReplayAllocation& allocation,
-                         MemorySpaceType memory_space) {
+                         std::string_view memory_space) {
   if (!allocation.has_input) {
     throw std::runtime_error("Input allocation '" + allocation.label +
                              "' is not available in the kernel dump");
@@ -184,7 +194,19 @@ void validate_comparison(const ReplayAllocation& allocation,
                              allocation.label +
                              "' is not available in the kernel dump");
   }
-  if (memory_space_type_from_string(allocation.memory_space) != memory_space) {
+  // All non-host captures are restored as ordinary device allocations.
+  std::string_view replay_space = Kokkos::HostSpace::name();
+  if (allocation.memory_space != replay_space) {
+#if defined(KOKKOS_ENABLE_CUDA)
+    replay_space = Kokkos::CudaSpace::name();
+#elif defined(KOKKOS_ENABLE_HIP)
+    replay_space = Kokkos::HIPSpace::name();
+#else
+    throw std::runtime_error(
+        "Trying to compare device allocations but no device space is enabled");
+#endif
+  }
+  if (memory_space != replay_space) {
     throw std::runtime_error("Incompatible memory space for allocation '" +
                              allocation.label + "'");
   }
