@@ -1,7 +1,10 @@
 #include <Kokkos_Core.hpp>
+#include <algorithm>
 #include <cassert>
+#include <exception>
+#include <limits>
+#include <iterator>
 #include <memory>
-#include <numeric>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -114,72 +117,107 @@ namespace krepe {
 
 namespace impl {
 
-static std::unordered_map<std::string, void*>* host_allocations;
-static std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>*
-    host_output_allocations;
-static std::unordered_set<std::string>* host_output_labels;
-#if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-static std::unordered_map<std::string, void*>* device_allocations;
-static std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>*
-    device_output_allocations;
-static std::unordered_set<std::string>* device_output_labels;
-#endif
-
+static const std::vector<StoredAllocation>* replay_allocations = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
 
-void* get_allocation(impl::MemorySpaceType memory_space,
-                     const std::string& label) {
-  if (memory_space == impl::MemorySpaceType::HOST) {
-    if (!host_allocations->contains(label)) {
-      return nullptr;
-    }
-    return (*host_allocations)[label];
-  } else {
+std::vector<ReplayAllocation> get_allocations(
+    MemorySpaceType memory_space, std::optional<std::string_view> label) {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
+  if (memory_space == MemorySpaceType::DEVICE) {
     throw std::runtime_error(
         "Trying to access device allocations but no device space is enabled");
-#else
-    if (!device_allocations->contains(label)) {
-      return nullptr;
-    }
-    return (*device_allocations)[label];
-#endif
   }
+#endif
+  if (replay_allocations == nullptr) {
+    throw std::runtime_error("No active KREPE replay allocations");
+  }
+  std::vector<ReplayAllocation> result;
+  for (const auto& stored : *replay_allocations) {
+    const auto& allocation = stored.descriptor;
+    if ((!label || allocation.label == *label) &&
+        memory_space_type_from_string(allocation.memory_space) ==
+            memory_space) {
+      result.push_back(allocation);
+    }
+  }
+  return result;
 }
 
-void* get_out_allocation(impl::MemorySpaceType memory_space,
+std::vector<ReplayAllocation> get_allocations(
+    std::string_view memory_space, std::optional<std::string_view> label) {
+  auto allocations =
+      get_allocations(memory_space_type_from_string(memory_space), label);
+  std::erase_if(allocations, [memory_space](const auto& allocation) {
+    return allocation.memory_space != memory_space;
+  });
+  return allocations;
+}
+
+static std::optional<ReplayAllocation> get_unique_allocation(
+    MemorySpaceType memory_space, const std::string& label) {
+  const auto allocations = get_allocations(memory_space, label);
+  if (allocations.size() > 1) {
+    throw std::runtime_error("Ambiguous allocation label '" + label +
+                             "': use get_allocations to select a descriptor");
+  }
+  if (allocations.empty()) {
+    return std::nullopt;
+  }
+  return allocations.front();
+}
+
+void* get_allocation(MemorySpaceType memory_space, const std::string& label) {
+  const auto allocation = get_unique_allocation(memory_space, label);
+  return allocation ? allocation->data : nullptr;
+}
+
+void* get_out_allocation(MemorySpaceType memory_space,
                          const std::string& label) {
-  if (memory_space == impl::MemorySpaceType::HOST) {
-    auto it = host_output_allocations->find(label);
-    if (it == host_output_allocations->end()) {
-      return nullptr;
-    }
-    return it->second.get();
-  } else {
-#if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-    throw std::runtime_error(
-        "Trying to access device allocations but no device space is enabled");
-#else
-    auto it = device_output_allocations->find(label);
-    if (it == device_output_allocations->end()) {
-      return nullptr;
-    }
-    return it->second.get();
-#endif
-  }
+  const auto allocation = get_unique_allocation(memory_space, label);
+  return allocation ? const_cast<void*>(allocation->reference_data) : nullptr;
 }
 
-bool has_out_allocation(impl::MemorySpaceType memory_space,
+bool has_out_allocation(MemorySpaceType memory_space,
                         const std::string& label) {
-  if (memory_space == impl::MemorySpaceType::HOST) {
-    return host_output_labels->contains(label);
-  } else {
-#if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-    throw std::runtime_error(
-        "Trying to access device allocations but no device space is enabled");
+  const auto allocation = get_unique_allocation(memory_space, label);
+  return allocation && allocation->has_reference;
+}
+
+void validate_comparison(const ReplayAllocation& allocation,
+                         std::string_view memory_space) {
+  if (!allocation.has_input) {
+    throw std::runtime_error("Input allocation '" + allocation.label +
+                             "' is not available in the kernel dump");
+  }
+  if (!allocation.has_reference) {
+    throw std::runtime_error("Reference output for allocation '" +
+                             allocation.label +
+                             "' is not available in the kernel dump");
+  }
+  // All non-host captures are restored as ordinary device allocations.
+  std::string_view replay_space = Kokkos::HostSpace::name();
+  if (allocation.memory_space != replay_space) {
+#if defined(KOKKOS_ENABLE_CUDA)
+    replay_space = Kokkos::CudaSpace::name();
+#elif defined(KOKKOS_ENABLE_HIP)
+    replay_space = Kokkos::HIPSpace::name();
 #else
-    return device_output_labels->contains(label);
+    throw std::runtime_error(
+        "Trying to compare device allocations but no device space is enabled");
 #endif
+  }
+  if (memory_space != replay_space) {
+    throw std::runtime_error("Incompatible memory space for allocation '" +
+                             allocation.label + "'");
+  }
+  if (allocation.size_bytes != allocation.reference_size_bytes) {
+    throw std::runtime_error("Incompatible byte counts for allocation '" +
+                             allocation.label + "'");
+  }
+  if (allocation.size_bytes != 0 &&
+      (allocation.data == nullptr || allocation.reference_data == nullptr)) {
+    throw std::runtime_error("Missing data for allocation '" +
+                             allocation.label + "'");
   }
 }
 
@@ -220,8 +258,62 @@ void free_host_buffer(char* ptr, MemorySpaceType mem) {
   }
 }
 
-using hdf5_iterate_fun_t = std::function<void(std::string, std::string_view,
-                                              char*, char*, std::size_t)>;
+struct SnapshotAllocation {
+  std::string label;
+  std::string space;
+  char* allocation_id;
+  char* address;
+  std::size_t size;
+  bool bytes_dumped;
+};
+
+struct AllocationKey {
+  // The captured allocation pointer includes its Kokkos header, so empty
+  // allocations remain distinct even when their data pointers are null.
+  char* captured_allocation;
+  std::string memory_space;
+
+  bool operator==(const AllocationKey&) const = default;
+};
+
+struct AllocationKeyHash {
+  std::size_t operator()(const AllocationKey& key) const {
+    const auto pointer = std::hash<char*>{}(key.captured_allocation);
+    const auto space   = std::hash<std::string>{}(key.memory_space);
+    return pointer ^ (space + 0x9e3779b9 + (pointer << 6) + (pointer >> 2));
+  }
+};
+
+using hdf5_iterate_fun_t =
+    std::function<void(const SnapshotAllocation&, char*)>;
+
+void iterate_allocations(hid_t file, const char* path, H5L_iterate_t callback,
+                         void* data) {
+  struct Context {
+    H5L_iterate_t callback;
+    void* data;
+    std::exception_ptr error;
+  } context{callback, data, nullptr};
+  const auto safe_callback = [](hid_t group, const char* name,
+                                const H5L_info_t* info,
+                                void* opaque) -> herr_t {
+    auto& context = *static_cast<Context*>(opaque);
+    try {
+      return context.callback(group, name, info, context.data);
+    } catch (...) {
+      context.error = std::current_exception();
+      return -1;
+    }
+  };
+  hsize_t idx = 0;
+  const herr_t status =
+      H5Literate_by_name(file, path, H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
+                         safe_callback, &context, H5P_DEFAULT);
+  if (context.error) {
+    std::rethrow_exception(context.error);
+  }
+  CHECK_HDF5_CALL(status);
+}
 
 std::string get_hdf5_string_attribute(hid_t group, const char* name,
                                       const char* attr_name) {
@@ -287,44 +379,61 @@ std::uint64_t get_hdf5_uint64_attribute(hid_t group, const char* name,
   return attribute;
 }
 
+SnapshotAllocation read_allocation_info(hid_t group, const char* name) {
+  const auto pointer_attribute = [&](const char* attribute) {
+    return reinterpret_cast<char*>(std::stoull(
+        get_hdf5_string_attribute(group, name, attribute), nullptr, 16));
+  };
+  const auto size = get_hdf5_uint64_attribute(group, name, "size");
+  if (size > std::numeric_limits<std::size_t>::max()) {
+    throw std::runtime_error("Allocation byte count is too large");
+  }
+  return {get_hdf5_string_attribute(group, name, "label"),
+          get_hdf5_string_attribute(group, name, "space"),
+          pointer_attribute("ptr"),
+          pointer_attribute("p_data"),
+          static_cast<std::size_t>(size),
+          get_hdf5_int_attribute(group, name, "bytes_dumped") != 0};
+}
+
+void check_byte_dataset(hid_t group, const char* name, std::size_t size) {
+  const std::string dataset = std::string(name) + "/bytes";
+  int rank                  = 0;
+  CHECK_HDF5_CALL(H5LTget_dataset_ndims(group, dataset.c_str(), &rank));
+  if (rank != 1) {
+    throw std::runtime_error("Expected a one-dimensional byte dataset: " +
+                             dataset);
+  }
+  hsize_t count = 0;
+  H5T_class_t datatype;
+  std::size_t datatype_size;
+  CHECK_HDF5_CALL(H5LTget_dataset_info(group, dataset.c_str(), &count,
+                                       &datatype, &datatype_size));
+  if (datatype != H5T_INTEGER || datatype_size != 1 || count != size) {
+    throw std::runtime_error("Inconsistent allocation byte dataset: " +
+                             dataset);
+  }
+}
+
 template <MemorySpaceType target_memory_space>
 herr_t get_hdf5_dataset_alloc_info(hid_t group, const char* name,
                                    const H5L_info_t*, void* allocation_set) {
-  std::string space = get_hdf5_string_attribute(group, name, "space");
-  char* address     = reinterpret_cast<char*>(std::stoull(
-      get_hdf5_string_attribute(group, name, "p_data"), nullptr, 16));
-
-  MemorySpaceType memory_space = memory_space_type_from_string(space);
-  if (memory_space != target_memory_space) {
+  const auto entry = read_allocation_info(group, name);
+  const auto space = memory_space_type_from_string(entry.space);
+  if (space != target_memory_space) {
     return 0;
   }
-
-  int rank = 0;
-  std::string dataset_name(name);
-  dataset_name += "/bytes";
-  CHECK_HDF5_CALL(H5LTget_dataset_ndims(group, dataset_name.c_str(), &rank));
-  std::vector<hsize_t> dims(rank);
-  H5T_class_t datatype;
-  std::size_t datatype_size;
-
-  CHECK_HDF5_CALL(H5LTget_dataset_info(group, dataset_name.c_str(), dims.data(),
-                                       &datatype, &datatype_size));
-  // We only deal with arrays of chars
-  assert(datatype == H5T_INTEGER);
-  assert(datatype_size == 1);
-
-  std::size_t buffer_size =
-      std::reduce(dims.begin(), dims.end(), 1, std::multiplies<>{});
-  if (buffer_size == 0) {
-    return 0;
+  if (!entry.bytes_dumped) {
+    throw std::runtime_error("Input allocation '" + entry.label +
+                             "' is not available in the kernel dump");
   }
-
-  auto allocations = reinterpret_cast<std::set<std::pair<char*, std::size_t>>*>(
-      allocation_set);
-  std::pair<char*, std::size_t> allocation_info =
-      get_allocation_address(address, buffer_size, memory_space);
-  allocations->insert(allocation_info);
-
+  check_byte_dataset(group, name, entry.size);
+  if (entry.size != 0) {
+    auto& allocations =
+        *static_cast<std::set<std::pair<char*, std::size_t>>*>(allocation_set);
+    allocations.insert(
+        get_allocation_address(entry.address, entry.size, space));
+  }
   return 0;
 }
 
@@ -338,56 +447,25 @@ herr_t read_hdf5_metadata(hid_t group, const char* name, const H5A_info_t*,
 
 herr_t allocate_hdf5_dataset(hid_t group, const char* name, const H5L_info_t*,
                              void* allocate_fun) {
-  std::string label = get_hdf5_string_attribute(group, name, "label");
-  std::string space = get_hdf5_string_attribute(group, name, "space");
-  char* address     = reinterpret_cast<char*>(std::stoull(
-      get_hdf5_string_attribute(group, name, "p_data"), nullptr, 16));
-
-  int rank = 0;
-  std::string dataset_name(name);
-  dataset_name += "/bytes";
-  CHECK_HDF5_CALL(H5LTget_dataset_ndims(group, dataset_name.c_str(), &rank));
-  std::vector<hsize_t> dims(rank);
-  H5T_class_t datatype;
-  std::size_t datatype_size;
-
-  CHECK_HDF5_CALL(H5LTget_dataset_info(group, dataset_name.c_str(), dims.data(),
-                                       &datatype, &datatype_size));
-  // We only deal with arrays of chars
-  assert(datatype == H5T_INTEGER);
-  assert(datatype_size == 1);
-
-  std::size_t buffer_size =
-      std::reduce(dims.begin(), dims.end(), 1, std::multiplies<>{});
-  if (buffer_size == 0) {
-    (*reinterpret_cast<hdf5_iterate_fun_t*>(allocate_fun))(label, space,
-                                                           nullptr, nullptr, 0);
+  const auto entry = read_allocation_info(group, name);
+  auto& callback   = *static_cast<hdf5_iterate_fun_t*>(allocate_fun);
+  if (entry.bytes_dumped) {
+    check_byte_dataset(group, name, entry.size);
+  }
+  if (!entry.bytes_dumped || entry.size == 0) {
+    callback(entry, nullptr);
     return 0;
   }
 
-  MemorySpaceType memory_space = memory_space_type_from_string(space);
-  auto free_buffer             = [memory_space](char* ptr) {
-    free_host_buffer(ptr, memory_space);
-  };
+  const auto space       = memory_space_type_from_string(entry.space);
+  const auto free_buffer = [space](char* ptr) { free_host_buffer(ptr, space); };
   std::unique_ptr<char, decltype(free_buffer)> buffer(
-      allocate_host_buffer(buffer_size, memory_space), free_buffer);
-  CHECK_HDF5_CALL(H5LTread_dataset(group, dataset_name.c_str(),
-                                   H5T_NATIVE_UCHAR, buffer.get()));
-
-  (*reinterpret_cast<hdf5_iterate_fun_t*>(allocate_fun))(
-      label, space, address, buffer.get(), buffer_size);
-
+      allocate_host_buffer(entry.size, space), free_buffer);
+  const std::string dataset = std::string(name) + "/bytes";
+  CHECK_HDF5_CALL(
+      H5LTread_dataset(group, dataset.c_str(), H5T_NATIVE_UCHAR, buffer.get()));
+  callback(entry, buffer.get());
   return 0;
-}
-
-herr_t allocate_hdf5_output_dataset(hid_t group, const char* name,
-                                    const H5L_info_t* info,
-                                    void* allocate_fun) {
-  if (get_hdf5_int_attribute(group, name, "bytes_dumped") == 0) {
-    return 0;
-  }
-
-  return allocate_hdf5_dataset(group, name, info, allocate_fun);
 }
 
 void read_functor_from_hdf5(hid_t file) {
@@ -669,13 +747,14 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
 
   std::set<std::pair<char*, std::size_t>> host_allocation_locs;
 
-  hsize_t idx = 0;
-  CHECK_HDF5_CALL(H5Literate_by_name(
-      file.get(), "in/views", H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
+  impl::iterate_allocations(
+      file.get(), "in/views",
       impl::get_hdf5_dataset_alloc_info<impl::MemorySpaceType::HOST>,
-      &host_allocation_locs, H5P_DEFAULT));
+      &host_allocation_locs);
 
-  for (auto [address, size] : impl::compute_allocations(host_allocation_locs)) {
+  const auto host_locations = impl::compute_allocations(host_allocation_locs);
+  host_raw_allocations.reserve(host_locations.size());
+  for (auto [address, size] : host_locations) {
     allocate(impl::MemorySpaceType::HOST, address, size);
   }
 
@@ -685,49 +764,54 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
 
   std::set<std::pair<char*, std::size_t>> device_allocation_locs;
 
-  idx = 0;
-  CHECK_HDF5_CALL(H5Literate_by_name(
-      file.get(), "in/views", H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
+  impl::iterate_allocations(
+      file.get(), "in/views",
       impl::get_hdf5_dataset_alloc_info<impl::MemorySpaceType::DEVICE>,
-      &device_allocation_locs, H5P_DEFAULT));
+      &device_allocation_locs);
 
-  for (auto [address, size] :
-       impl::compute_allocations(device_allocation_locs)) {
+  const auto device_locations =
+      impl::compute_allocations(device_allocation_locs);
+#if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
+  device_raw_allocations.reserve(device_locations.size());
+#endif
+  for (auto [address, size] : device_locations) {
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
-  impl::hdf5_iterate_fun_t copy_data_wrapper =
-      [this](std::string label, std::string_view memory_space, char* address,
-             char* data, std::size_t size) {
-        impl::MemorySpaceType space =
-            impl::memory_space_type_from_string(memory_space);
-        if (size == 0) {
-          if (space == impl::MemorySpaceType::HOST) {
-            host_allocations[label] = nullptr;
-          } else {
-#if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-            device_allocations[label] = nullptr;
-#endif
-          }
-          return;
-        }
+  std::unordered_map<impl::AllocationKey, std::size_t, impl::AllocationKeyHash>
+      allocation_index;
 
-        impl::copy_data(space, address, data, size);
-        if (space == impl::MemorySpaceType::HOST) {
-          host_allocations[label] = address;
-        } else {
-#if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-          device_allocations[label] = address;
-#endif
+  impl::hdf5_iterate_fun_t copy_data_wrapper =
+      [this, &allocation_index](const impl::SnapshotAllocation& entry,
+                                char* data) {
+        if (!entry.bytes_dumped) {
+          throw std::runtime_error("Missing input bytes for allocation '" +
+                                   entry.label + "'");
         }
+        if (!allocation_index
+                 .try_emplace({entry.allocation_id, entry.space},
+                              replay_allocations.size())
+                 .second) {
+          throw std::runtime_error("Duplicate input allocation '" +
+                                   entry.label + "'");
+        }
+        if (entry.size != 0) {
+          impl::copy_data(impl::memory_space_type_from_string(entry.space),
+                          entry.address, data, entry.size);
+        }
+        replay_allocations.push_back(
+            {entry.allocation_id,
+             ReplayAllocation{.label        = entry.label,
+                              .memory_space = entry.space,
+                              .data = entry.size != 0 ? entry.address : nullptr,
+                              .size_bytes = entry.size,
+                              .has_input  = true}});
       };
 
-  idx = 0;
-  CHECK_HDF5_CALL(H5Literate_by_name(
-      file.get(), "in/views", H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
-      impl::allocate_hdf5_dataset, &copy_data_wrapper, H5P_DEFAULT));
+  impl::iterate_allocations(file.get(), "in/views", impl::allocate_hdf5_dataset,
+                            &copy_data_wrapper);
 
-  idx = 0;
+  hsize_t idx = 0;
   CHECK_HDF5_CALL(
       H5Aiterate_by_name(file.get(), "metadata", H5_INDEX_NAME, H5_ITER_NATIVE,
                          &idx, impl::read_hdf5_metadata, nullptr, H5P_DEFAULT));
@@ -737,9 +821,18 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
   impl::read_policy_from_hdf5(file.get());
 
   impl::hdf5_iterate_fun_t allocate_wrapper =
-      [this](std::string label, std::string_view memory_space, char*,
-             char* data, std::size_t size) {
-        allocate_output(label, memory_space, data, size);
+      [this, &allocation_index](const impl::SnapshotAllocation& entry,
+                                char* data) {
+        const auto [it, inserted] = allocation_index.try_emplace(
+            impl::AllocationKey{entry.allocation_id, entry.space},
+            replay_allocations.size());
+        if (inserted) {
+          replay_allocations.push_back(
+              {entry.allocation_id,
+               ReplayAllocation{.label        = entry.label,
+                                .memory_space = entry.space}});
+        }
+        allocate_output(replay_allocations[it->second], entry, data);
       };
 
   htri_t has_output = H5Lexists(file.get(), "out", H5P_DEFAULT);
@@ -750,25 +843,20 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
   }
 
   if (has_output > 0) {
-    idx = 0;
-    CHECK_HDF5_CALL(H5Literate_by_name(
-        file.get(), "out/views", H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
-        impl::allocate_hdf5_output_dataset, &allocate_wrapper, H5P_DEFAULT));
+    impl::iterate_allocations(file.get(), "out/views",
+                              impl::allocate_hdf5_dataset, &allocate_wrapper);
   }
 
   file.close_checked();
 
-  impl::host_allocations        = &host_allocations;
-  impl::host_output_allocations = &host_output_allocations;
-  impl::host_output_labels      = &host_output_labels;
-#if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-  impl::device_allocations        = &device_allocations;
-  impl::device_output_allocations = &device_output_allocations;
-  impl::device_output_labels      = &device_output_labels;
-#endif
+  impl::replay_allocations = &replay_allocations;
 }
 
-ScopeGuard::~ScopeGuard() {}
+ScopeGuard::~ScopeGuard() {
+  if (impl::replay_allocations == &replay_allocations) {
+    impl::replay_allocations = nullptr;
+  }
+}
 
 std::optional<std::string> get_metadata(const std::string& key) {
   try {
@@ -792,30 +880,32 @@ void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
   }
 }
 
-void ScopeGuard::allocate_output(std::string label,
-                                 std::string_view memory_space, char* data,
-                                 std::size_t size) {
-  if (impl::memory_space_type_from_string(memory_space) ==
+void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
+                                 const impl::SnapshotAllocation& snapshot,
+                                 char* data) {
+  if (allocation.output_seen || allocation.descriptor.label != snapshot.label) {
+    throw std::runtime_error("Duplicate or inconsistent output allocation '" +
+                             snapshot.label + "'");
+  }
+  allocation.output_seen          = true;
+  auto& descriptor                = allocation.descriptor;
+  descriptor.reference_size_bytes = snapshot.size;
+  descriptor.has_reference        = snapshot.bytes_dumped;
+  if (!snapshot.bytes_dumped || snapshot.size == 0) {
+    return;
+  }
+  if (impl::memory_space_type_from_string(snapshot.space) ==
       impl::MemorySpaceType::HOST) {
-    host_output_labels.insert(label);
-    if (size == 0) {
-      return;
-    }
-    host_output_allocations.insert_or_assign(
-        label, impl::regular_host_allocate(size, data));
+    allocation.reference = impl::regular_host_allocate(snapshot.size, data);
   } else {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
     throw std::runtime_error(
         "Trying to access device allocations but no device space is enabled");
 #else
-    device_output_labels.insert(label);
-    if (size == 0) {
-      return;
-    }
-    device_output_allocations.insert_or_assign(
-        label, impl::regular_device_allocate(size, data));
+    allocation.reference = impl::regular_device_allocate(snapshot.size, data);
 #endif
   }
+  descriptor.reference_data = allocation.reference.get();
 }
 
 }  // namespace krepe
