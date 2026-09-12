@@ -416,7 +416,8 @@ class ScopeGuard {
   void allocate(impl::MemorySpaceType memory_space, char* address,
                 std::size_t size);
 
-  void allocate_output(const impl::SnapshotAllocation& snapshot, char* data);
+  void allocate_output(impl::StoredAllocation& allocation,
+                       const impl::SnapshotAllocation& snapshot, char* data);
 
  public:
   ScopeGuard(int& argc, char* argv[]);

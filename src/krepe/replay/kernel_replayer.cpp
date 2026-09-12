@@ -267,16 +267,22 @@ struct SnapshotAllocation {
   bool bytes_dumped;
 };
 
-auto find_allocation(std::vector<StoredAllocation>& allocations,
-                     const SnapshotAllocation& snapshot) {
+struct AllocationKey {
   // The captured allocation pointer includes its Kokkos header, so empty
   // allocations remain distinct even when their data pointers are null.
-  return std::find_if(
-      allocations.begin(), allocations.end(), [&](const auto& entry) {
-        return entry.captured_allocation == snapshot.allocation_id &&
-               entry.descriptor.memory_space == snapshot.space;
-      });
-}
+  char* captured_allocation;
+  std::string memory_space;
+
+  bool operator==(const AllocationKey&) const = default;
+};
+
+struct AllocationKeyHash {
+  std::size_t operator()(const AllocationKey& key) const {
+    const auto pointer = std::hash<char*>{}(key.captured_allocation);
+    const auto space   = std::hash<std::string>{}(key.memory_space);
+    return pointer ^ (space + 0x9e3779b9 + (pointer << 6) + (pointer >> 2));
+  }
+};
 
 using hdf5_iterate_fun_t =
     std::function<void(const SnapshotAllocation&, char*)>;
@@ -772,14 +778,20 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
+  std::unordered_map<impl::AllocationKey, std::size_t, impl::AllocationKeyHash>
+      allocation_index;
+
   impl::hdf5_iterate_fun_t copy_data_wrapper =
-      [this](const impl::SnapshotAllocation& entry, char* data) {
+      [this, &allocation_index](const impl::SnapshotAllocation& entry,
+                                char* data) {
         if (!entry.bytes_dumped) {
           throw std::runtime_error("Missing input bytes for allocation '" +
                                    entry.label + "'");
         }
-        if (impl::find_allocation(replay_allocations, entry) !=
-            replay_allocations.end()) {
+        if (!allocation_index
+                 .try_emplace({entry.allocation_id, entry.space},
+                              replay_allocations.size())
+                 .second) {
           throw std::runtime_error("Duplicate input allocation '" +
                                    entry.label + "'");
         }
@@ -809,8 +821,18 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
   impl::read_policy_from_hdf5(file.get());
 
   impl::hdf5_iterate_fun_t allocate_wrapper =
-      [this](const impl::SnapshotAllocation& entry, char* data) {
-        allocate_output(entry, data);
+      [this, &allocation_index](const impl::SnapshotAllocation& entry,
+                                char* data) {
+        const auto [it, inserted] = allocation_index.try_emplace(
+            impl::AllocationKey{entry.allocation_id, entry.space},
+            replay_allocations.size());
+        if (inserted) {
+          replay_allocations.push_back(
+              {entry.allocation_id,
+               ReplayAllocation{.label        = entry.label,
+                                .memory_space = entry.space}});
+        }
+        allocate_output(replay_allocations[it->second], entry, data);
       };
 
   htri_t has_output = H5Lexists(file.get(), "out", H5P_DEFAULT);
@@ -858,23 +880,15 @@ void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
   }
 }
 
-void ScopeGuard::allocate_output(const impl::SnapshotAllocation& snapshot,
+void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
+                                 const impl::SnapshotAllocation& snapshot,
                                  char* data) {
-  auto allocation = impl::find_allocation(replay_allocations, snapshot);
-  if (allocation == replay_allocations.end()) {
-    replay_allocations.push_back(
-        {snapshot.allocation_id,
-         ReplayAllocation{.label        = snapshot.label,
-                          .memory_space = snapshot.space}});
-    allocation = std::prev(replay_allocations.end());
-  }
-  if (allocation->output_seen ||
-      allocation->descriptor.label != snapshot.label) {
+  if (allocation.output_seen || allocation.descriptor.label != snapshot.label) {
     throw std::runtime_error("Duplicate or inconsistent output allocation '" +
                              snapshot.label + "'");
   }
-  allocation->output_seen         = true;
-  auto& descriptor                = allocation->descriptor;
+  allocation.output_seen          = true;
+  auto& descriptor                = allocation.descriptor;
   descriptor.reference_size_bytes = snapshot.size;
   descriptor.has_reference        = snapshot.bytes_dumped;
   if (!snapshot.bytes_dumped || snapshot.size == 0) {
@@ -882,16 +896,16 @@ void ScopeGuard::allocate_output(const impl::SnapshotAllocation& snapshot,
   }
   if (impl::memory_space_type_from_string(snapshot.space) ==
       impl::MemorySpaceType::HOST) {
-    allocation->reference = impl::regular_host_allocate(snapshot.size, data);
+    allocation.reference = impl::regular_host_allocate(snapshot.size, data);
   } else {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
     throw std::runtime_error(
         "Trying to access device allocations but no device space is enabled");
 #else
-    allocation->reference = impl::regular_device_allocate(snapshot.size, data);
+    allocation.reference = impl::regular_device_allocate(snapshot.size, data);
 #endif
   }
-  descriptor.reference_data = allocation->reference.get();
+  descriptor.reference_data = allocation.reference.get();
 }
 
 }  // namespace krepe
