@@ -118,7 +118,7 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL Clang OR CMAKE_CXX_COMPILER_ID STREQUAL AppleC
   message(STATUS "Enabling the Clang plugin")
   set(KREPE_HAS_COMPILER_PLUGINS TRUE PARENT_SCOPE)
 
-  add_library(krepe_clang_plugin MODULE clang.cpp)
+  add_library(krepe_clang_plugin MODULE clang.cpp clang_auto_extract.cpp)
   target_include_directories(krepe_clang_plugin PRIVATE "${LLVM_INCLUDE_DIRS}")
   target_link_directories(krepe_clang_plugin PRIVATE "${LLVM_LIBRARY_DIRS}")
   target_link_libraries(krepe_clang_plugin PRIVATE "${LLVM_LIBRARIES}")

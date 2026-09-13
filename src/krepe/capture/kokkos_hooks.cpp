@@ -23,6 +23,7 @@
 #include <optional>
 #include <iostream>
 #include <mutex>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -78,6 +79,9 @@ std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
              krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,
              krepe::TeamPolicyDesc>
     policy = krepe::NoPolicyDesc{};
+
+const char* replay_source_fmt_string = nullptr;
+std::string replay_source;
 
 std::string dump_kernel_label;
 std::optional<std::uint64_t> dump_kernel_invocation = 1;
@@ -166,6 +170,9 @@ void log_dump_result(const char* phase, const krepe::ViewDumpResult& result,
              "\" kernel_id=", kernel_id, " invocation=", invocation,
              " active_allocations=", snapshot.allocations.size(),
              " active_bytes=", snapshot.active_bytes);
+    if (!result.replay_filename.empty()) {
+      log_line("replay source written to ", result.replay_filename);
+    }
   } else {
     log_line("dump_failed phase=", phase, " path=\"", result.filename,
              "\" kernel_id=", kernel_id, " invocation=", invocation,
@@ -177,9 +184,9 @@ krepe::ViewDumpResult dump_input_views(const std::string& label,
                                        const std::uint64_t kernel_id,
                                        const std::uint64_t invocation) {
   const krepe::AllocationSnapshot snapshot = allocation_tracker.snapshot();
-  krepe::ViewDumpResult result =
-      krepe::create_kernel_dump(snapshot, functor_data, nvcc_inner_lambda_data,
-                                metadata, policy, label, kernel_id, invocation);
+  krepe::ViewDumpResult result             = krepe::create_kernel_dump(
+      snapshot, functor_data, nvcc_inner_lambda_data, metadata, policy,
+      replay_source, label, kernel_id, invocation);
   log_dump_result("in", result, snapshot, kernel_id, invocation);
   return result;
 }
@@ -354,6 +361,24 @@ void end_kernel(const std::uint64_t kernel_id) {
   }
 }
 
+void create_replay_source(const std::string& arg) {
+  if (!replay_source_fmt_string) {
+    return;
+  }
+
+  std::string_view fmt_string_view(replay_source_fmt_string);
+  std::size_t placeholder_pos = fmt_string_view.find("{@}");
+
+  if (placeholder_pos == std::string::npos) {
+    log_line("[WARNING] Failed to find placeholder in the replay source");
+    return;
+  }
+
+  replay_source = fmt_string_view.substr(0, placeholder_pos);
+  replay_source += arg;
+  replay_source += fmt_string_view.substr(placeholder_pos + 3);
+}
+
 }  // namespace
 
 extern "C" {
@@ -384,7 +409,14 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_copy_nvcc_lambda(
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_scalar_policy(
     std::uint64_t N) {
+  // FIXME: don't set the policy variant if the auto-extraction is enabled
   policy = krepe::ScalarPolicyDesc(N);
+
+  if (!replay_source_fmt_string) {
+    return;
+  }
+
+  create_replay_source(std::to_string(N));
 }
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_range_policy(
@@ -393,6 +425,15 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_range_policy(
     int chunk_size) {
   policy = krepe::RangePolicyDesc({index_type_size, index_type_signed}, space,
                                   schedule, begin, end, chunk_size);
+
+  if (!replay_source_fmt_string) {
+    return;
+  }
+
+  std::ostringstream stream;
+  stream << '(' << begin << ", " << end << ", Kokkos::ChunkSize(" << chunk_size
+         << ')';
+  create_replay_source(stream.str());
 }
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_mdrange_policy(
@@ -404,6 +445,26 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_mdrange_policy(
       {index_type_size, index_type_signed}, space, schedule, rank, outer_dir,
       inner_dir, std::vector(begin, begin + rank), std::vector(end, end + rank),
       std::vector(tile, tile + rank));
+
+  if (!replay_source_fmt_string) {
+    return;
+  }
+
+  std::ostringstream stream;
+  stream << "({" << begin[0];
+  for (std::size_t i = 1; i < rank; i++) {
+    stream << ", " << begin[i];
+  }
+  stream << "}, {" << end[0];
+  for (std::size_t i = 1; i < rank; i++) {
+    stream << ", " << end[i];
+  }
+  stream << "}, {" << tile[0];
+  for (std::size_t i = 1; i < rank; i++) {
+    stream << ", " << tile[i];
+  }
+  stream << "})";
+  create_replay_source(stream.str());
 }
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_team_policy(
@@ -415,6 +476,32 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_team_policy(
       {index_type_size, index_type_signed}, space, schedule, team_size,
       league_size, vector_length, team_scratch_0, team_scratch_1,
       thread_scratch_0, thread_scratch_1, chunk_size);
+
+  if (!replay_source_fmt_string) {
+    return;
+  }
+
+  std::ostringstream stream;
+  stream << '(' << league_size << ", ";
+  if (team_size > 0) {
+    stream << team_size;
+  } else {
+    stream << "Kokkos::AUTO";
+  }
+  stream << ", ";
+  if (vector_length > 0) {
+    stream << vector_length;
+  } else {
+    stream << "Kokkos::AUTO";
+  }
+  stream << ").set_chunk_size(" << chunk_size << ')';
+  if (team_scratch_0 >= 0) {
+    stream << ".set_scratch_size(0, Kokkos::PerTeam(" << team_scratch_0
+           << "), Kokkos::PerThread(" << thread_scratch_0 << ")";
+    stream << ".set_scratch_size(1, Kokkos::PerTeam(" << team_scratch_1
+           << "), Kokkos::PerThread(" << thread_scratch_1 << ")";
+  }
+  create_replay_source(stream.str());
 }
 
 KOKKOS_HOOKS_EXPORT bool krepe_kernel_dump_next_invocation_will_dump(
@@ -431,6 +518,11 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_clear_registered_views() {
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_view(void* data,
                                                          const char* space) {
   allocation_tracker.record_used_allocation(space, data);
+}
+
+KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_replay_source(
+    const char* source) {
+  replay_source_fmt_string = source;
 }
 
 KOKKOS_HOOKS_EXPORT void kokkosp_begin_parallel_for(

@@ -33,9 +33,10 @@ void register_team_policy(const char* space, const char* schedule,
                           const scratch_description& team_scratch,
                           const scratch_description& thread_scratch,
                           int chunk_size);
-bool next_invocation_will_dump(const char* kernel_name);
+bool next_invocation_will_dump(const std::string& kernel_name);
 void clear_registered_views();
 void register_view(void* data, const char* space);
+void register_replay_source(const char* source);
 
 template <std::integral IndexType>
 constexpr std::pair<std::size_t, bool> get_index_type_props() {
@@ -188,7 +189,10 @@ Functor replay_functor(Functor&& functor) {
 template <class Policy, class Functor>
 void parallel_for(const std::string& label, const Policy& policy,
                   Functor&& functor) {
-  if (impl::next_invocation_will_dump(label.c_str())) {
+  // We store the result of `next_invocation_will_dump` in a variable as the
+  // first tatement of the function so that the plugins can find it easily
+  const bool will_dump = impl::next_invocation_will_dump(label);
+  if (will_dump) {
     impl::register_bounds(policy);
     Kokkos::parallel_for(label, policy, replay_functor(functor));
   } else {

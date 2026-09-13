@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -253,8 +254,8 @@ ViewDumpResult create_kernel_dump(
     const std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
                        krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,
                        krepe::TeamPolicyDesc>& policy,
-    std::string_view label, std::uint64_t kernel_id,
-    std::uint64_t kernel_invocation) {
+    const std::string& replay_source, std::string_view label,
+    std::uint64_t kernel_id, std::uint64_t kernel_invocation) {
   ViewDumpResult result;
   result.filename = dump_filename(label, kernel_id);
 
@@ -306,6 +307,15 @@ ViewDumpResult create_kernel_dump(
     functor_group.close_checked();
 
     file.close_checked();
+
+    if (!replay_source.empty()) {
+      std::filesystem::path replay_path = dump_path;
+      replay_path.replace_extension(".cpp");
+      result.replay_filename = replay_path.string();
+      std::ofstream file(replay_path);
+      file << replay_source;
+    }
+
     result.ok = true;
   } catch (const std::exception& error) {
     result.ok    = false;

@@ -35,7 +35,7 @@ int main(int argc, char* argv[]) {
 
   const auto dump = krepe::create_kernel_dump(input_snapshot, functor_data, {},
                                               {}, krepe::ScalarPolicyDesc{N},
-                                              "test_kernel", 1, 1);
+                                              {}, "test_kernel", 1, 1);
   if (!dump.ok) {
     return 1;
   }
