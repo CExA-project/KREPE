@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 #include <variant>
@@ -49,6 +50,8 @@ void* get_out_allocation(impl::MemorySpaceType memory_space,
                          const std::string& label);
 bool has_out_allocation(impl::MemorySpaceType memory_space,
                         const std::string& label);
+const ReplayAllocation* get_unique_allocation(MemorySpaceType memory_space,
+                                              const std::string& label);
 
 struct SnapshotAllocation;
 struct StoredAllocation {
@@ -57,6 +60,9 @@ struct StoredAllocation {
   bool output_seen = false;
   std::unique_ptr<void, void (*)(void*)> reference{nullptr, nullptr};
 };
+
+using AllocationLabelIndex = std::unordered_map<
+    MemorySpaceType, std::unordered_map<std::string, std::vector<std::size_t>>>;
 
 std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label);
@@ -408,6 +414,7 @@ struct ParallelForVisitor {
 class ScopeGuard {
  private:
   std::vector<impl::StoredAllocation> replay_allocations;
+  impl::AllocationLabelIndex allocation_labels;
   std::vector<impl::Allocation> host_raw_allocations;
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
   std::vector<impl::Allocation> device_raw_allocations;
@@ -445,16 +452,16 @@ void compare_views(View const& view, Tuple args, Functor&& f) {
   using memory_space = View::memory_space;
   using value_type   = View::value_type;
 
-  value_type* data = static_cast<value_type*>(
-      krepe::get_allocation<memory_space>(view.label()));
-  if (!impl::has_out_allocation(
-          impl::memory_space_type_from_string(memory_space::name()),
-          view.label())) {
-    throw std::runtime_error("Reference output for view '" + view.label() +
+  const auto label       = view.label();
+  const auto* allocation = impl::get_unique_allocation(
+      impl::memory_space_type_from_string(memory_space::name()), label);
+  if (allocation == nullptr || !allocation->has_reference) {
+    throw std::runtime_error("Reference output for view '" + label +
                              "' is not available in the kernel dump");
   }
-  value_type* ref_data = static_cast<value_type*>(
-      krepe::get_out_allocation<memory_space>(view.label()));
+  value_type* data = static_cast<value_type*>(allocation->data);
+  value_type* ref_data =
+      static_cast<value_type*>(const_cast<void*>(allocation->reference_data));
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,
@@ -474,15 +481,15 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
   using memory_space = View::memory_space;
   using value_type   = View::value_type;
 
-  value_type* data =
-      static_cast<value_type*>(krepe::get_allocation<memory_space>(label));
-  if (!impl::has_out_allocation(
-          impl::memory_space_type_from_string(memory_space::name()), label)) {
+  const auto* allocation = impl::get_unique_allocation(
+      impl::memory_space_type_from_string(memory_space::name()), label);
+  if (allocation == nullptr || !allocation->has_reference) {
     throw std::runtime_error("Reference output for view '" + label +
                              "' is not available in the kernel dump");
   }
+  value_type* data = static_cast<value_type*>(allocation->data);
   value_type* ref_data =
-      static_cast<value_type*>(krepe::get_out_allocation<memory_space>(label));
+      static_cast<value_type*>(const_cast<void*>(allocation->reference_data));
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,

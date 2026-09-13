@@ -29,22 +29,24 @@ int main(int argc, char* argv[]) {
   //     Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), values);
   // Kokkos::printf("values(5) = %d\n", h_values(5));
 
-  krepe::compare_views<int*>(
-      "values", std::make_tuple(1024), [](auto ref_values, auto replay_values) {
-        auto h_replay_values = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace(), replay_values);
+  const auto compare = [](auto ref_values, auto replay_values) {
+    auto h_replay_values =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), replay_values);
 
-        auto h_ref_values = Kokkos::create_mirror_view_and_copy(
-            Kokkos::HostSpace(), ref_values);
+    auto h_ref_values =
+        Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), ref_values);
 
-        for (int i = 0; i < N; i++) {
-          if (h_replay_values(i) != h_ref_values(i)) {
-            Kokkos::printf("At index %d, expected %d but got %d\n", i,
-                           h_ref_values(i), h_replay_values(i));
-            std::exit(1);
-          }
-        }
-      });
+    for (int i = 0; i < N; i++) {
+      if (h_replay_values(i) != h_ref_values(i)) {
+        Kokkos::printf("At index %d, expected %d but got %d\n", i,
+                       h_ref_values(i), h_replay_values(i));
+        std::exit(1);
+      }
+    }
+  };
+  krepe::compare_views<int*>("values", std::make_tuple(N), compare);
+  Kokkos::View<int*> named_values("values", 0);
+  krepe::compare_views(named_values, std::make_tuple(N), compare);
 
   const auto triplet_allocations = krepe::get_allocations<Space>("triplets");
   if (triplet_allocations.size() != 1) {

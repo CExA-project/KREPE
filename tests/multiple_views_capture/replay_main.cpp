@@ -3,6 +3,8 @@
 #include <krepe/replayer.hpp>
 
 #include <stdexcept>
+#include <string>
+#include <tuple>
 #include <type_traits>
 
 int main(int argc, char* argv[]) {
@@ -38,6 +40,22 @@ int main(int argc, char* argv[]) {
     krepe::get_out_allocation<memory_space>("values");
     return 1;
   } catch (const std::runtime_error&) {
+  }
+  bool callback_called = false;
+  try {
+    krepe::compare_views<int*>("values", std::make_tuple(N),
+                               [&](auto, auto) { callback_called = true; });
+    return 1;
+  } catch (const std::runtime_error& error) {
+    if (callback_called ||
+        std::string(error.what()).find("Ambiguous allocation label") ==
+            std::string::npos) {
+      return 1;
+    }
+  }
+  if (krepe::get_allocation<memory_space>("missing") != nullptr ||
+      krepe::get_out_allocation<memory_space>("missing") != nullptr) {
+    return 1;
   }
   std::size_t same_label_count = 0;
   for (const auto& allocation : krepe::get_allocations<memory_space>()) {

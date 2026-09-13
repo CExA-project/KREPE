@@ -118,10 +118,11 @@ namespace krepe {
 namespace impl {
 
 static const std::vector<StoredAllocation>* replay_allocations = nullptr;
+static const AllocationLabelIndex* allocation_labels           = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
 
-std::vector<ReplayAllocation> get_allocations(
-    MemorySpaceType memory_space, std::optional<std::string_view> label) {
+static void check_replay_allocations(
+    [[maybe_unused]] MemorySpaceType memory_space) {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
   if (memory_space == MemorySpaceType::DEVICE) {
     throw std::runtime_error(
@@ -131,12 +132,36 @@ std::vector<ReplayAllocation> get_allocations(
   if (replay_allocations == nullptr) {
     throw std::runtime_error("No active KREPE replay allocations");
   }
+}
+
+static const std::vector<std::size_t>* find_label_indices(
+    MemorySpaceType memory_space, const std::string& label) {
+  const auto space = allocation_labels->find(memory_space);
+  if (space == allocation_labels->end()) {
+    return nullptr;
+  }
+  const auto entry = space->second.find(label);
+  return entry == space->second.end() ? nullptr : &entry->second;
+}
+
+std::vector<ReplayAllocation> get_allocations(
+    MemorySpaceType memory_space, std::optional<std::string_view> label) {
+  check_replay_allocations(memory_space);
   std::vector<ReplayAllocation> result;
+  if (label) {
+    if (const auto* indices =
+            find_label_indices(memory_space, std::string(*label))) {
+      result.reserve(indices->size());
+      for (const auto index : *indices) {
+        result.push_back((*replay_allocations)[index].descriptor);
+      }
+    }
+    return result;
+  }
   for (const auto& stored : *replay_allocations) {
     const auto& allocation = stored.descriptor;
-    if ((!label || allocation.label == *label) &&
-        memory_space_type_from_string(allocation.memory_space) ==
-            memory_space) {
+    if (memory_space_type_from_string(allocation.memory_space) ==
+        memory_space) {
       result.push_back(allocation);
     }
   }
@@ -153,17 +178,18 @@ std::vector<ReplayAllocation> get_allocations(
   return allocations;
 }
 
-static std::optional<ReplayAllocation> get_unique_allocation(
-    MemorySpaceType memory_space, const std::string& label) {
-  const auto allocations = get_allocations(memory_space, label);
-  if (allocations.size() > 1) {
+const ReplayAllocation* get_unique_allocation(MemorySpaceType memory_space,
+                                              const std::string& label) {
+  check_replay_allocations(memory_space);
+  const auto* indices = find_label_indices(memory_space, label);
+  if (indices == nullptr) {
+    return nullptr;
+  }
+  if (indices->size() > 1) {
     throw std::runtime_error("Ambiguous allocation label '" + label +
                              "': use get_allocations to select a descriptor");
   }
-  if (allocations.empty()) {
-    return std::nullopt;
-  }
-  return allocations.front();
+  return &(*replay_allocations)[indices->front()].descriptor;
 }
 
 void* get_allocation(MemorySpaceType memory_space, const std::string& label) {
@@ -849,12 +875,21 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
 
   file.close_checked();
 
+  for (std::size_t i = 0; i < replay_allocations.size(); ++i) {
+    const auto& allocation = replay_allocations[i].descriptor;
+    const auto space =
+        impl::memory_space_type_from_string(allocation.memory_space);
+    allocation_labels[space][allocation.label].push_back(i);
+  }
+
   impl::replay_allocations = &replay_allocations;
+  impl::allocation_labels  = &allocation_labels;
 }
 
 ScopeGuard::~ScopeGuard() {
   if (impl::replay_allocations == &replay_allocations) {
     impl::replay_allocations = nullptr;
+    impl::allocation_labels  = nullptr;
   }
 }
 
