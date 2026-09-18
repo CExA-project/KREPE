@@ -381,19 +381,19 @@ class ScopeGuard {
     std::vector<char> data;
   };
 
-  bool input_reset_enabled;
-  std::vector<InputSnapshot> input_snapshots;
-  std::vector<impl::Allocation> host_raw_allocations;
-  std::unordered_map<std::string, void*> host_allocations;
+  bool enable_input_reset_;
+  std::vector<InputSnapshot> input_snapshots_;
+  std::vector<impl::Allocation> host_raw_allocations_;
+  std::unordered_map<std::string, void*> host_allocations_;
   std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>
-      host_output_allocations;
-  std::unordered_set<std::string> host_output_labels;
+      host_output_allocations_;
+  std::unordered_set<std::string> host_output_labels_;
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-  std::vector<impl::Allocation> device_raw_allocations;
-  std::unordered_map<std::string, void*> device_allocations;
+  std::vector<impl::Allocation> device_raw_allocations_;
+  std::unordered_map<std::string, void*> device_allocations_;
   std::unordered_map<std::string, std::unique_ptr<void, void (*)(void*)>>
-      device_output_allocations;
-  std::unordered_set<std::string> device_output_labels;
+      device_output_allocations_;
+  std::unordered_set<std::string> device_output_labels_;
 #endif
 
   void allocate(impl::MemorySpaceType memory_space, char* address,

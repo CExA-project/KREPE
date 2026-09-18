@@ -656,7 +656,7 @@ std::vector<std::pair<char*, std::size_t>> compute_allocations(
 }  // namespace impl
 
 ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
-    : input_reset_enabled(enable_input_reset) {
+    : enable_input_reset_(enable_input_reset) {
   std::string_view hdf5_filename =
       find_flag_argument(argc, argv, "--kernel-replayer-dump");
   if (hdf5_filename.data() == nullptr) {
@@ -704,25 +704,25 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
             impl::memory_space_type_from_string(memory_space);
         if (size == 0) {
           if (space == impl::MemorySpaceType::HOST) {
-            host_allocations[label] = nullptr;
+            host_allocations_[label] = nullptr;
           } else {
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-            device_allocations[label] = nullptr;
+            device_allocations_[label] = nullptr;
 #endif
           }
           return;
         }
 
         impl::copy_data(space, address, data, size);
-        if (input_reset_enabled) {
-          input_snapshots.push_back(
+        if (enable_input_reset_) {
+          input_snapshots_.push_back(
               {space, address, std::vector<char>(data, data + size)});
         }
         if (space == impl::MemorySpaceType::HOST) {
-          host_allocations[label] = address;
+          host_allocations_[label] = address;
         } else {
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-          device_allocations[label] = address;
+          device_allocations_[label] = address;
 #endif
         }
       };
@@ -763,20 +763,20 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
 
   file.close_checked();
 
-  impl::host_allocations        = &host_allocations;
-  impl::host_output_allocations = &host_output_allocations;
-  impl::host_output_labels      = &host_output_labels;
+  impl::host_allocations        = &host_allocations_;
+  impl::host_output_allocations = &host_output_allocations_;
+  impl::host_output_labels      = &host_output_labels_;
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
-  impl::device_allocations        = &device_allocations;
-  impl::device_output_allocations = &device_output_allocations;
-  impl::device_output_labels      = &device_output_labels;
+  impl::device_allocations        = &device_allocations_;
+  impl::device_output_allocations = &device_output_allocations_;
+  impl::device_output_labels      = &device_output_labels_;
 #endif
 }
 
 ScopeGuard::~ScopeGuard() {}
 
 void ScopeGuard::reset_inputs() {
-  if (!input_reset_enabled) {
+  if (!enable_input_reset_) {
     throw std::runtime_error(
         "Input reset must be enabled when constructing krepe::ScopeGuard");
   }
@@ -785,7 +785,7 @@ void ScopeGuard::reset_inputs() {
   }
 
   Kokkos::fence("KREPE before resetting inputs");
-  for (auto& input : input_snapshots) {
+  for (auto& input : input_snapshots_) {
     impl::copy_data(input.memory_space, input.address, input.data.data(),
                     input.data.size());
   }
@@ -803,13 +803,13 @@ std::optional<std::string> get_metadata(const std::string& key) {
 void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
                           std::size_t size) {
   if (memory_space == impl::MemorySpaceType::HOST) {
-    host_raw_allocations.emplace_back(memory_space, address, size);
+    host_raw_allocations_.emplace_back(memory_space, address, size);
   } else {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
     throw std::runtime_error(
         "Trying to access device allocations but no device space is enabled");
 #else
-    device_raw_allocations.emplace_back(memory_space, address, size);
+    device_raw_allocations_.emplace_back(memory_space, address, size);
 #endif
   }
 }
@@ -819,22 +819,22 @@ void ScopeGuard::allocate_output(std::string label,
                                  std::size_t size) {
   if (impl::memory_space_type_from_string(memory_space) ==
       impl::MemorySpaceType::HOST) {
-    host_output_labels.insert(label);
+    host_output_labels_.insert(label);
     if (size == 0) {
       return;
     }
-    host_output_allocations.insert_or_assign(
+    host_output_allocations_.insert_or_assign(
         label, impl::regular_host_allocate(size, data));
   } else {
 #if !defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
     throw std::runtime_error(
         "Trying to access device allocations but no device space is enabled");
 #else
-    device_output_labels.insert(label);
+    device_output_labels_.insert(label);
     if (size == 0) {
       return;
     }
-    device_output_allocations.insert_or_assign(
+    device_output_allocations_.insert_or_assign(
         label, impl::regular_device_allocate(size, data));
 #endif
   }
