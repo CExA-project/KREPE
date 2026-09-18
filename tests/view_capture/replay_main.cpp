@@ -6,6 +6,16 @@ int main(int argc, char* argv[]) {
   krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
+  bool rejected = false;
+  try {
+    replay_scope.reset_inputs();
+  } catch (const std::runtime_error&) {
+    rejected = true;
+  }
+  if (!rejected) {
+    throw std::runtime_error("Reset without saved inputs was accepted");
+  }
+
   const int N = 1024;
   Kokkos::View<int*> values;
   // Kokkos::parallel_for(
