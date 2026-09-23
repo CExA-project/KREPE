@@ -407,7 +407,7 @@ class ScopeGuard {
   ScopeGuard(int& argc, char* argv[], bool enable_input_reset = false);
   ScopeGuard(const ScopeGuard&)            = delete;
   ScopeGuard& operator=(const ScopeGuard&) = delete;
-  ~ScopeGuard();
+  ~ScopeGuard()                            = default;
 
   // Restore inputs at their original addresses without reloading the dump.
   // Requires input reset to be enabled and Kokkos to be initialized.

@@ -773,8 +773,6 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
 #endif
 }
 
-ScopeGuard::~ScopeGuard() {}
-
 void ScopeGuard::reset_inputs() {
   if (!enable_input_reset_) {
     throw std::runtime_error(
