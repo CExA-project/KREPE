@@ -13,7 +13,8 @@ int main(int argc, char* argv[]) {
     rejected = true;
   }
   if (!rejected) {
-    throw std::runtime_error("Reset without saved inputs was accepted");
+    throw std::runtime_error(
+        "reset_inputs() succeeded even though input reset was disabled");
   }
 
   const int N = 1024;
