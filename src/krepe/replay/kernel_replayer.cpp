@@ -779,7 +779,8 @@ void ScopeGuard::reset_inputs() {
         "Input reset must be enabled when constructing krepe::ScopeGuard");
   }
   if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
-    throw std::runtime_error("reset_inputs can be called only inside Kokkos execution environment");
+    throw std::runtime_error(
+        "reset_inputs can be called only inside Kokkos execution environment");
   }
 
   Kokkos::fence("KREPE before resetting inputs");
