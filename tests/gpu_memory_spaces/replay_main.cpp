@@ -103,33 +103,37 @@ void compare_values(const krepe::ReplayAllocation& allocation) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv, true);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
   Kokkos::View<int*, DeviceSpace> device_values;
   Kokkos::View<int*, ManagedSpace> managed_values;
   Kokkos::View<int*, HostPinnedSpace> host_pinned_values;
 
-  krepe::parallel_for(
-      "test_kernel", 0, KOKKOS_LAMBDA(const int i) {
-        device_values(i) *= 2;
-        managed_values(i) *= 3;
-        host_pinned_values(i) *= 4;
-      });
-  Kokkos::fence();
+  for (int repetition = 0; repetition < 3; ++repetition) {
+    replay_scope.reset_inputs();
+    krepe::parallel_for(
+        "test_kernel", 0, KOKKOS_LAMBDA(const int i) {
+          device_values(i) *= 2;
+          managed_values(i) *= 3;
+          host_pinned_values(i) *= 4;
+        });
+    Kokkos::fence();
 
-  require_dumped_allocation<DeviceSpace>("device_values");
-  require_dumped_allocation<ManagedSpace>("managed_values");
-  require_dumped_allocation<HostPinnedSpace>("host_pinned_values");
+    require_dumped_allocation<DeviceSpace>("device_values");
+    require_dumped_allocation<ManagedSpace>("managed_values");
+    require_dumped_allocation<HostPinnedSpace>("host_pinned_values");
 
-  const auto device  = require_descriptor<DeviceSpace>("device_values");
-  const auto managed = require_descriptor<ManagedSpace>("managed_values");
-  const auto pinned = require_descriptor<HostPinnedSpace>("host_pinned_values");
-  for (const auto& allocation : {device, managed, pinned}) {
-    require_comparison_rejected<ManagedSpace>(allocation);
-    require_comparison_rejected<HostPinnedSpace>(allocation);
-    require_comparison_rejected<Kokkos::HostSpace>(allocation);
-    compare_values(allocation);
+    const auto device  = require_descriptor<DeviceSpace>("device_values");
+    const auto managed = require_descriptor<ManagedSpace>("managed_values");
+    const auto pinned =
+        require_descriptor<HostPinnedSpace>("host_pinned_values");
+    for (const auto& allocation : {device, managed, pinned}) {
+      require_comparison_rejected<ManagedSpace>(allocation);
+      require_comparison_rejected<HostPinnedSpace>(allocation);
+      require_comparison_rejected<Kokkos::HostSpace>(allocation);
+      compare_values(allocation);
+    }
   }
 
   return 0;

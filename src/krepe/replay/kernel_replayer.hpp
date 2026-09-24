@@ -413,6 +413,14 @@ struct ParallelForVisitor {
 
 class ScopeGuard {
  private:
+  struct InputSnapshot {
+    impl::MemorySpaceType memory_space;
+    char* address;
+    std::vector<char> data;
+  };
+
+  bool enable_input_reset_;
+  std::vector<InputSnapshot> input_snapshots_;
   std::vector<impl::StoredAllocation> replay_allocations;
   impl::AllocationLabelIndex allocation_labels;
   std::vector<impl::Allocation> host_raw_allocations;
@@ -427,10 +435,15 @@ class ScopeGuard {
                        const impl::SnapshotAllocation& snapshot, char* data);
 
  public:
-  ScopeGuard(int& argc, char* argv[]);
+  // Enabling input reset keeps a host copy of all input allocation bytes.
+  ScopeGuard(int& argc, char* argv[], bool enable_input_reset = false);
   ScopeGuard(const ScopeGuard&)            = delete;
   ScopeGuard& operator=(const ScopeGuard&) = delete;
   ~ScopeGuard();
+
+  // Restore inputs at their original addresses without reloading the dump.
+  // Requires input reset to be enabled and Kokkos to be initialized.
+  void reset_inputs();
 };
 
 std::optional<std::string> get_metadata(const std::string& key);

@@ -759,7 +759,8 @@ std::vector<std::pair<char*, std::size_t>> compute_allocations(
 }
 }  // namespace impl
 
-ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
+ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
+    : enable_input_reset_(enable_input_reset) {
   std::string_view hdf5_filename =
       find_flag_argument(argc, argv, "--kernel-replayer-dump");
   if (hdf5_filename.data() == nullptr) {
@@ -822,8 +823,13 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
                                    entry.label + "'");
         }
         if (entry.size != 0) {
-          impl::copy_data(impl::memory_space_type_from_string(entry.space),
-                          entry.address, data, entry.size);
+          const auto space = impl::memory_space_type_from_string(entry.space);
+          impl::copy_data(space, entry.address, data, entry.size);
+          if (enable_input_reset_) {
+            input_snapshots_.push_back(
+                {space, entry.address,
+                 std::vector<char>(data, data + entry.size)});
+          }
         }
         replay_allocations.push_back(
             {entry.allocation_id,
@@ -891,6 +897,24 @@ ScopeGuard::~ScopeGuard() {
     impl::replay_allocations = nullptr;
     impl::allocation_labels  = nullptr;
   }
+}
+
+void ScopeGuard::reset_inputs() {
+  if (!enable_input_reset_) {
+    throw std::runtime_error(
+        "Input reset must be enabled when constructing krepe::ScopeGuard");
+  }
+  if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
+    throw std::runtime_error(
+        "reset_inputs can be called only inside Kokkos execution environment");
+  }
+
+  Kokkos::fence("KREPE before resetting inputs");
+  for (auto& input : input_snapshots_) {
+    impl::copy_data(input.memory_space, input.address, input.data.data(),
+                    input.data.size());
+  }
+  Kokkos::fence("KREPE after resetting inputs");
 }
 
 std::optional<std::string> get_metadata(const std::string& key) {

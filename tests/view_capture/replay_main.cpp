@@ -8,6 +8,17 @@ int main(int argc, char* argv[]) {
   krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
+  bool reset_rejected = false;
+  try {
+    replay_scope.reset_inputs();
+  } catch (const std::runtime_error&) {
+    reset_rejected = true;
+  }
+  if (!reset_rejected) {
+    throw std::runtime_error(
+        "reset_inputs() succeeded even though input reset was disabled");
+  }
+
   const int N   = 1024;
   using Triplet = Kokkos::Array<float, 3>;
   using Space   = Kokkos::DefaultExecutionSpace::memory_space;
