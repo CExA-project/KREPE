@@ -178,6 +178,19 @@ the `--kernel-replayer-dump` command line flag:
 ./replay_prog --kernel-replayer-dump=krepe_scale_2.h5
 ```
 
+### Repeating a replay with the same inputs
+
+```cpp
+krepe::ScopeGuard replay_scope(argc, argv, /*enable_input_reset=*/true);
+Kokkos::ScopeGuard kokkos_scope(argc, argv);
+
+replay_scope.reset_inputs();
+```
+
+This option stores a copy of the inputs in host memory. `reset_inputs()` waits
+for previous work and restores those bytes at the same addresses, completing
+all copies before returning.
+
 ### Modifying the execution policy
 
 By default, `krepe::parallel_for` will use the execution policy

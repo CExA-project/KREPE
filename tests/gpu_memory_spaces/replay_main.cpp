@@ -52,28 +52,31 @@ void compare_values(const char* label) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv, true);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
   Kokkos::View<int*, DeviceSpace> device_values;
   Kokkos::View<int*, ManagedSpace> managed_values;
   Kokkos::View<int*, HostPinnedSpace> host_pinned_values;
 
-  krepe::parallel_for(
-      "test_kernel", 0, KOKKOS_LAMBDA(const int i) {
-        device_values(i) *= 2;
-        managed_values(i) *= 3;
-        host_pinned_values(i) *= 4;
-      });
-  Kokkos::fence();
+  for (int repetition = 0; repetition < 3; ++repetition) {
+    replay_scope.reset_inputs();
+    krepe::parallel_for(
+        "test_kernel", 0, KOKKOS_LAMBDA(const int i) {
+          device_values(i) *= 2;
+          managed_values(i) *= 3;
+          host_pinned_values(i) *= 4;
+        });
+    Kokkos::fence();
 
-  require_dumped_allocation<DeviceSpace>("device_values");
-  require_dumped_allocation<ManagedSpace>("managed_values");
-  require_dumped_allocation<HostPinnedSpace>("host_pinned_values");
+    require_dumped_allocation<DeviceSpace>("device_values");
+    require_dumped_allocation<ManagedSpace>("managed_values");
+    require_dumped_allocation<HostPinnedSpace>("host_pinned_values");
 
-  compare_values("device_values");
-  compare_values("managed_values");
-  compare_values("host_pinned_values");
+    compare_values("device_values");
+    compare_values("managed_values");
+    compare_values("host_pinned_values");
+  }
 
   return 0;
 }
