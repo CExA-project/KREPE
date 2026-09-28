@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 project(
   KREPE
   VERSION 0.0.1
-  DESCRIPTION "Kernel Replay, Execution for Performance Evaluation"
+  DESCRIPTION "Kernel Replay Execution for Performance Evaluation"
   LANGUAGES CXX
 )
 

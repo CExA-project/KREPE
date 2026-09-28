@@ -1,6 +1,6 @@
 # KREPE
 
-KREPE (Kernel Replay, Execution for Performance Evaluation) captures the
+KREPE (Kernel Replay Execution for Performance Evaluation) captures the
 execution context of Kokkos kernels and replays them in standalone programs for
 controlled performance evaluation.
 
