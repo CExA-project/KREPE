@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-// SPDX-FileCopyrightText: Copyright Contributors to the Kokkos project
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
 
 #include <clang/AST/AST.h>
 #include <clang/AST/ASTConsumer.h>
