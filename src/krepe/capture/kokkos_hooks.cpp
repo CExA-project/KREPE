@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
+// SPDX-License-Identifier: MIT
 // SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
 
 /*

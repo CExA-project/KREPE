@@ -231,6 +231,6 @@ Kokkos::View<int*> result_values(result_values_ptr, 1024);
 
 ## License
 
-[![License](https://img.shields.io/badge/License-Apache--2.0_WITH_LLVM--exception-blue)](https://spdx.org/licenses/LLVM-exception.html)
+[![License](https://img.shields.io/badge/License-MIT-blue)](https://spdx.org/licenses/MIT.html)
 
 The full license statement used in all headers is available [here](LICENSE).
