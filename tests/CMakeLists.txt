@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 enable_testing()
 
 set(TEST_LAUNCHER "${CMAKE_CURRENT_LIST_DIR}/launcher.sh")

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 cmake_minimum_required(VERSION 3.26 FATAL_ERROR)
 
 project(

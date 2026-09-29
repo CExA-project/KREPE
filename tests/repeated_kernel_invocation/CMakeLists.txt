@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 add_executable(repeated_kernel_invocation main.cpp)
 target_link_libraries(
   repeated_kernel_invocation PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_extractor
