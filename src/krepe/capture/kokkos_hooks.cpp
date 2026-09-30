@@ -160,20 +160,12 @@ std::optional<std::uint64_t> parse_positive_uint64(std::string_view value) {
   return parsed;
 }
 
-void log_dump_result(const char* phase, const krepe::ViewDumpResult& result,
-                     const krepe::AllocationSnapshot& snapshot,
-                     const std::uint64_t kernel_id,
-                     const std::uint64_t invocation) {
-  if (result.ok) {
-    log_line("dump_written phase=", phase, " path=\"", result.filename,
-             "\" kernel_id=", kernel_id, " invocation=", invocation,
-             " active_allocations=", snapshot.allocations.size(),
-             " active_bytes=", snapshot.active_bytes);
-  } else {
-    log_line("dump_failed phase=", phase, " path=\"", result.filename,
-             "\" kernel_id=", kernel_id, " invocation=", invocation,
-             " error=\"", result.error, "\"");
-  }
+void log_dump_failure(const char* phase, const krepe::ViewDumpResult& result,
+                      const std::uint64_t kernel_id,
+                      const std::uint64_t invocation) {
+  log_line("dump_failed phase=", phase, " path=\"", result.filename,
+           "\" kernel_id=", kernel_id, " invocation=", invocation, " error=\"",
+           result.error, "\"");
 }
 
 krepe::ViewDumpResult dump_input_views(const std::string& label,
@@ -183,7 +175,9 @@ krepe::ViewDumpResult dump_input_views(const std::string& label,
   krepe::ViewDumpResult result =
       krepe::create_kernel_dump(snapshot, functor_data, nvcc_inner_lambda_data,
                                 metadata, policy, label, kernel_id, invocation);
-  log_dump_result("in", result, snapshot, kernel_id, invocation);
+  if (!result.ok) {
+    log_dump_failure("in", result, kernel_id, invocation);
+  }
   return result;
 }
 
@@ -193,7 +187,14 @@ void dump_output_views(const std::string& dump_path,
   const krepe::AllocationSnapshot snapshot = allocation_tracker.snapshot();
   krepe::ViewDumpResult result =
       krepe::append_kernel_output(snapshot, dump_path);
-  log_dump_result("out", result, snapshot, kernel_id, invocation);
+  if (result.ok) {
+    log_line("capture_finished path=\"", result.filename,
+             "\" kernel_id=", kernel_id, " invocation=", invocation,
+             " active_allocations=", snapshot.allocations.size(),
+             " active_bytes=", snapshot.active_bytes);
+  } else {
+    log_dump_failure("out", result, kernel_id, invocation);
+  }
 }
 
 bool should_track_allocation(const char* label, const void* ptr) {
@@ -312,7 +313,7 @@ void begin_kernel(const char* label, const std::uint32_t device_id,
   }
 
   if (dump_this_kernel) {
-    log_line("kernel_selected label=\"", kernel_label,
+    log_line("capture_started label=\"", kernel_label,
              "\" invocation=", invocation, " kernel_id=", id);
     Kokkos_Tools_toolInvokedFenceFunction fence = nullptr;
     {
