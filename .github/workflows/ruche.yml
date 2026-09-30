@@ -1,6 +1,7 @@
 # Portions of this workflow were adapted from Kokkos-FFT:
 # https://github.com/kokkos/kokkos-fft
 #
+# The following copyright statement is from Kokkos-FFT.
 # SPDX-FileCopyrightText: (C) The Kokkos-FFT development team, see Kokkos-FFT COPYRIGHT.md
 # SPDX-License-Identifier: MIT OR Apache-2.0 WITH LLVM-exception
 
