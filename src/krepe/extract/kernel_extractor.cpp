@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 #include "kernel_extractor.hpp"
 #include <iostream>
 #if defined(KOKKOS_ENABLE_LIBDL)
