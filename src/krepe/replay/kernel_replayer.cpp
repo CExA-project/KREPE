@@ -831,16 +831,11 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
   impl::hdf5_iterate_fun_t allocate_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
                                 char* data) {
-        const auto [it, inserted] = allocation_index.try_emplace(
-            std::make_pair(entry.allocation_id, entry.space), nullptr);
-        if (inserted) {
-          const auto space = impl::memory_space_type_from_string(entry.space);
-          const auto allocation = replay_allocations_[space].emplace(
-              entry.label, impl::StoredAllocation{
-                               entry.allocation_id,
-                               ReplayAllocation{.label        = entry.label,
-                                                .memory_space = entry.space}});
-          it->second = &allocation->second;
+        const auto it = allocation_index.find(
+            std::make_pair(entry.allocation_id, entry.space));
+        if (it == allocation_index.end()) {
+          throw std::runtime_error("Output allocation '" + entry.label +
+                                   "' has no matching input allocation");
         }
         allocate_output(*it->second, entry, data);
       };
