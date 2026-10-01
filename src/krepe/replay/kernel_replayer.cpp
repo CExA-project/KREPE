@@ -3,11 +3,13 @@
 #include <cassert>
 #include <exception>
 #include <iterator>
+#include <map>
 #include <memory>
 #include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 #include <unordered_map>
 
@@ -290,23 +292,6 @@ struct SnapshotAllocation {
   char* address;
   std::size_t size;
   bool bytes_dumped;
-};
-
-struct AllocationKey {
-  // The captured allocation pointer includes its Kokkos header, so empty
-  // allocations remain distinct even when their data pointers are null.
-  char* captured_allocation;
-  std::string memory_space;
-
-  bool operator==(const AllocationKey&) const = default;
-};
-
-struct AllocationKeyHash {
-  std::size_t operator()(const AllocationKey& key) const {
-    const auto pointer = std::hash<char*>{}(key.captured_allocation);
-    const auto space   = std::hash<std::string>{}(key.memory_space);
-    return pointer ^ (space + 0x9e3779b9 + (pointer << 6) + (pointer >> 2));
-  }
 };
 
 using hdf5_iterate_fun_t =
@@ -801,8 +786,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
-  std::unordered_map<impl::AllocationKey, std::size_t, impl::AllocationKeyHash>
-      allocation_index;
+  std::map<std::pair<char*, std::string>, std::size_t> allocation_index;
 
   impl::hdf5_iterate_fun_t copy_data_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
@@ -852,8 +836,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
                                 char* data) {
         const auto [it, inserted] = allocation_index.try_emplace(
-            impl::AllocationKey{entry.allocation_id, entry.space},
-            replay_allocations.size());
+            {entry.allocation_id, entry.space}, replay_allocations.size());
         if (inserted) {
           replay_allocations.push_back(
               {entry.allocation_id,
