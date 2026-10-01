@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <cassert>
 #include <exception>
-#include <limits>
 #include <iterator>
 #include <memory>
 #include <set>
@@ -411,9 +410,6 @@ SnapshotAllocation read_allocation_info(hid_t group, const char* name) {
         get_hdf5_string_attribute(group, name, attribute), nullptr, 16));
   };
   const auto size = get_hdf5_uint64_attribute(group, name, "size");
-  if (size > std::numeric_limits<std::size_t>::max()) {
-    throw std::runtime_error("Allocation byte count is too large");
-  }
   return {get_hdf5_string_attribute(group, name, "label"),
           get_hdf5_string_attribute(group, name, "space"),
           pointer_attribute("ptr"),
