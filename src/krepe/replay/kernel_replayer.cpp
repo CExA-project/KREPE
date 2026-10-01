@@ -118,8 +118,7 @@ namespace krepe {
 
 namespace impl {
 
-static const std::vector<StoredAllocation>* replay_allocations = nullptr;
-static const AllocationLabelIndex* allocation_labels           = nullptr;
+static const ReplayAllocations* replay_allocations = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
 
 static void check_replay_allocations(
@@ -135,36 +134,25 @@ static void check_replay_allocations(
   }
 }
 
-static const std::vector<std::size_t>* find_label_indices(
-    MemorySpaceType memory_space, const std::string& label) {
-  const auto space = allocation_labels->find(memory_space);
-  if (space == allocation_labels->end()) {
-    return nullptr;
-  }
-  const auto entry = space->second.find(label);
-  return entry == space->second.end() ? nullptr : &entry->second;
-}
-
 std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label) {
   check_replay_allocations(memory_space);
   std::vector<ReplayAllocation> result;
+  const auto space = replay_allocations->find(memory_space);
+  if (space == replay_allocations->end()) {
+    return result;
+  }
   if (label) {
-    if (const auto* indices =
-            find_label_indices(memory_space, std::string(*label))) {
-      result.reserve(indices->size());
-      for (const auto index : *indices) {
-        result.push_back((*replay_allocations)[index].descriptor);
-      }
+    const auto [first, last] = space->second.equal_range(std::string(*label));
+    result.reserve(std::distance(first, last));
+    for (auto it = first; it != last; ++it) {
+      result.push_back(it->second.descriptor);
     }
     return result;
   }
-  for (const auto& stored : *replay_allocations) {
-    const auto& allocation = stored.descriptor;
-    if (memory_space_type_from_string(allocation.memory_space) ==
-        memory_space) {
-      result.push_back(allocation);
-    }
+  result.reserve(space->second.size());
+  for (const auto& entry : space->second) {
+    result.push_back(entry.second.descriptor);
   }
   return result;
 }
@@ -182,15 +170,19 @@ std::vector<ReplayAllocation> get_allocations(
 const ReplayAllocation* get_unique_allocation(MemorySpaceType memory_space,
                                               const std::string& label) {
   check_replay_allocations(memory_space);
-  const auto* indices = find_label_indices(memory_space, label);
-  if (indices == nullptr) {
+  const auto space = replay_allocations->find(memory_space);
+  if (space == replay_allocations->end()) {
     return nullptr;
   }
-  if (indices->size() > 1) {
+  const auto [first, last] = space->second.equal_range(label);
+  if (first == last) {
+    return nullptr;
+  }
+  if (std::next(first) != last) {
     throw std::runtime_error("Ambiguous allocation label '" + label +
                              "': use get_allocations to select a descriptor");
   }
-  return &(*replay_allocations)[indices->front()].descriptor;
+  return &first->second.descriptor;
 }
 
 void* get_allocation(MemorySpaceType memory_space, const std::string& label) {
@@ -786,7 +778,8 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
-  std::map<std::pair<char*, std::string>, std::size_t> allocation_index;
+  std::map<std::pair<char*, std::string>, impl::StoredAllocation*>
+      allocation_index;
 
   impl::hdf5_iterate_fun_t copy_data_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
@@ -795,15 +788,14 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
           throw std::runtime_error("Missing input bytes for allocation '" +
                                    entry.label + "'");
         }
-        if (!allocation_index
-                 .try_emplace({entry.allocation_id, entry.space},
-                              replay_allocations.size())
-                 .second) {
+        const auto [it, inserted] = allocation_index.try_emplace(
+            std::make_pair(entry.allocation_id, entry.space), nullptr);
+        if (!inserted) {
           throw std::runtime_error("Duplicate input allocation '" +
                                    entry.label + "'");
         }
+        const auto space = impl::memory_space_type_from_string(entry.space);
         if (entry.size != 0) {
-          const auto space = impl::memory_space_type_from_string(entry.space);
           impl::copy_data(space, entry.address, data, entry.size);
           if (enable_input_reset_) {
             input_snapshots_.push_back(
@@ -811,13 +803,17 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
                  std::vector<char>(data, data + entry.size)});
           }
         }
-        replay_allocations.push_back(
-            {entry.allocation_id,
-             ReplayAllocation{.label        = entry.label,
-                              .memory_space = entry.space,
-                              .data = entry.size != 0 ? entry.address : nullptr,
-                              .size_bytes = entry.size,
-                              .has_input  = true}});
+        const auto allocation = replay_allocations_[space].emplace(
+            entry.label,
+            impl::StoredAllocation{
+                entry.allocation_id,
+                ReplayAllocation{
+                    .label        = entry.label,
+                    .memory_space = entry.space,
+                    .data         = entry.size != 0 ? entry.address : nullptr,
+                    .size_bytes   = entry.size,
+                    .has_input    = true}});
+        it->second = &allocation->second;
       };
 
   impl::iterate_allocations(file.get(), "in/views", impl::allocate_hdf5_dataset,
@@ -836,14 +832,17 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
                                 char* data) {
         const auto [it, inserted] = allocation_index.try_emplace(
-            {entry.allocation_id, entry.space}, replay_allocations.size());
+            std::make_pair(entry.allocation_id, entry.space), nullptr);
         if (inserted) {
-          replay_allocations.push_back(
-              {entry.allocation_id,
-               ReplayAllocation{.label        = entry.label,
-                                .memory_space = entry.space}});
+          const auto space = impl::memory_space_type_from_string(entry.space);
+          const auto allocation = replay_allocations_[space].emplace(
+              entry.label, impl::StoredAllocation{
+                               entry.allocation_id,
+                               ReplayAllocation{.label        = entry.label,
+                                                .memory_space = entry.space}});
+          it->second = &allocation->second;
         }
-        allocate_output(replay_allocations[it->second], entry, data);
+        allocate_output(*it->second, entry, data);
       };
 
   htri_t has_output = H5Lexists(file.get(), "out", H5P_DEFAULT);
@@ -860,21 +859,12 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
 
   file.close_checked();
 
-  for (std::size_t i = 0; i < replay_allocations.size(); ++i) {
-    const auto& allocation = replay_allocations[i].descriptor;
-    const auto space =
-        impl::memory_space_type_from_string(allocation.memory_space);
-    allocation_labels[space][allocation.label].push_back(i);
-  }
-
-  impl::replay_allocations = &replay_allocations;
-  impl::allocation_labels  = &allocation_labels;
+  impl::replay_allocations = &replay_allocations_;
 }
 
 ScopeGuard::~ScopeGuard() {
-  if (impl::replay_allocations == &replay_allocations) {
+  if (impl::replay_allocations == &replay_allocations_) {
     impl::replay_allocations = nullptr;
-    impl::allocation_labels  = nullptr;
   }
 }
 

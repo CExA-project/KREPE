@@ -61,8 +61,9 @@ struct StoredAllocation {
   std::unique_ptr<void, void (*)(void*)> reference{nullptr, nullptr};
 };
 
-using AllocationLabelIndex = std::unordered_map<
-    MemorySpaceType, std::unordered_map<std::string, std::vector<std::size_t>>>;
+using ReplayAllocations =
+    std::unordered_map<MemorySpaceType,
+                       std::unordered_multimap<std::string, StoredAllocation>>;
 
 std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label);
@@ -421,8 +422,7 @@ class ScopeGuard {
 
   bool enable_input_reset_;
   std::vector<InputSnapshot> input_snapshots_;
-  std::vector<impl::StoredAllocation> replay_allocations;
-  impl::AllocationLabelIndex allocation_labels;
+  impl::ReplayAllocations replay_allocations_;
   std::vector<impl::Allocation> host_raw_allocations;
 #if defined(KERNEL_REPLAYER_HAS_DEVICE_SPACE)
   std::vector<impl::Allocation> device_raw_allocations;
