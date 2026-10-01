@@ -199,7 +199,7 @@ void* get_allocation(MemorySpaceType memory_space, const std::string& label) {
 void* get_out_allocation(MemorySpaceType memory_space,
                          const std::string& label) {
   const auto allocation = get_unique_allocation(memory_space, label);
-  return allocation ? const_cast<void*>(allocation->reference_data) : nullptr;
+  return allocation ? allocation->reference_data : nullptr;
 }
 
 bool has_out_allocation(MemorySpaceType memory_space,

@@ -28,7 +28,7 @@ struct ReplayAllocation {
   std::string memory_space;
   void* data                       = nullptr;
   std::size_t size_bytes           = 0;
-  const void* reference_data       = nullptr;
+  void* reference_data             = nullptr;
   std::size_t reference_size_bytes = 0;
   bool has_input                   = false;
   bool has_reference               = false;
@@ -474,7 +474,7 @@ void compare_views(View const& view, Tuple args, Functor&& f) {
   }
   value_type* data = static_cast<value_type*>(allocation->data);
   value_type* ref_data =
-      static_cast<value_type*>(const_cast<void*>(allocation->reference_data));
+      static_cast<value_type*>(allocation->reference_data);
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,
@@ -502,7 +502,7 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
   }
   value_type* data = static_cast<value_type*>(allocation->data);
   value_type* ref_data =
-      static_cast<value_type*>(const_cast<void*>(allocation->reference_data));
+      static_cast<value_type*>(allocation->reference_data);
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,
