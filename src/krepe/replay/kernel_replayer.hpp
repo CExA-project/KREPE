@@ -472,9 +472,8 @@ void compare_views(View const& view, Tuple args, Functor&& f) {
     throw std::runtime_error("Reference output for view '" + label +
                              "' is not available in the kernel dump");
   }
-  value_type* data = static_cast<value_type*>(allocation->data);
-  value_type* ref_data =
-      static_cast<value_type*>(allocation->reference_data);
+  value_type* data     = static_cast<value_type*>(allocation->data);
+  value_type* ref_data = static_cast<value_type*>(allocation->reference_data);
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,
@@ -500,9 +499,8 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
     throw std::runtime_error("Reference output for view '" + label +
                              "' is not available in the kernel dump");
   }
-  value_type* data = static_cast<value_type*>(allocation->data);
-  value_type* ref_data =
-      static_cast<value_type*>(allocation->reference_data);
+  value_type* data     = static_cast<value_type*>(allocation->data);
+  value_type* ref_data = static_cast<value_type*>(allocation->reference_data);
 
   using ViewType = Kokkos::View<
       typename View::data_type, typename View::array_layout, memory_space,
@@ -553,7 +551,7 @@ decltype(auto) compare_views(const ReplayAllocation& allocation, Tuple args,
       std::make_tuple(
           static_cast<const value_type*>(allocation.reference_data)),
       args));
-  return std::invoke(std::forward<Functor>(f), expected, actual);
+  return f(expected, actual);
 }
 
 // Infer a flat array's extent from the recorded byte count, including padding.
