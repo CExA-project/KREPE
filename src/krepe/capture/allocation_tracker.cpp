@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 #include "allocation_tracker.hpp"
 
 #include <algorithm>

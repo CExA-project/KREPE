@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 // clang-format off
 #include <gcc-plugin.h>
 #include <plugin-version.h>

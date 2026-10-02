@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 add_library(krepe_kokkos_hooks SHARED)
 target_sources(
   krepe_kokkos_hooks

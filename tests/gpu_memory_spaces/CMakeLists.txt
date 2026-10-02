@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 add_executable(gpu_memory_spaces main.cpp)
 target_link_libraries(gpu_memory_spaces PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_extractor)
 

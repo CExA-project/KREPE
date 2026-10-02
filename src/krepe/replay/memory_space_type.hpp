@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 #pragma once
 
 #include <string_view>

@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 add_executable(small_struct_functor main.cpp)
 target_link_libraries(small_struct_functor PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_extractor)
 

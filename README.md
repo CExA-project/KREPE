@@ -1,6 +1,6 @@
 # KREPE
 
-KREPE (Kernel Replay, Execution for Performance Evaluation) captures the
+KREPE (Kernel Replay Execution for Performance Evaluation) captures the
 execution context of Kokkos kernels and replays them in standalone programs for
 controlled performance evaluation.
 
@@ -228,3 +228,9 @@ Kokkos::View<int*> result_values(result_values_ptr, 1024);
   cannot be automatically restored in the replayed program
 - Depending on your Kokkos version, the scratch memory parameters for
   `TeamPolicy` may not be automatically restored in the replayed program
+
+## License
+
+[![License](https://img.shields.io/badge/License-MIT-blue)](https://spdx.org/licenses/MIT.html)
+
+The full license statement used in all headers is available [here](LICENSE).

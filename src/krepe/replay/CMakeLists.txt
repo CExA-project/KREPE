@@ -1,3 +1,6 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
 function(krepe_add_kernel_replayer TARGET_NAME)
   add_library("${TARGET_NAME}")
   target_sources(
