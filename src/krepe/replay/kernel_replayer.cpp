@@ -141,20 +141,22 @@ std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label) {
   check_replay_allocations(memory_space);
   std::vector<ReplayAllocation> result;
-  const auto space = replay_allocations->find(memory_space);
-  if (space == replay_allocations->end()) {
+  const auto space_it = replay_allocations->find(memory_space);
+  if (space_it == replay_allocations->end()) {
     return result;
   }
+  const auto& space_allocations = space_it->second;
   if (label) {
-    const auto [first, last] = space->second.equal_range(std::string(*label));
+    const auto [first, last] =
+        space_allocations.equal_range(std::string(*label));
     result.reserve(std::distance(first, last));
     for (auto it = first; it != last; ++it) {
       result.push_back(it->second.descriptor);
     }
     return result;
   }
-  result.reserve(space->second.size());
-  for (const auto& entry : space->second) {
+  result.reserve(space_allocations.size());
+  for (const auto& entry : space_allocations) {
     result.push_back(entry.second.descriptor);
   }
   return result;
@@ -173,11 +175,12 @@ std::vector<ReplayAllocation> get_allocations(
 const ReplayAllocation* get_unique_allocation(MemorySpaceType memory_space,
                                               const std::string& label) {
   check_replay_allocations(memory_space);
-  const auto space = replay_allocations->find(memory_space);
-  if (space == replay_allocations->end()) {
+  const auto space_it = replay_allocations->find(memory_space);
+  if (space_it == replay_allocations->end()) {
     return nullptr;
   }
-  const auto [first, last] = space->second.equal_range(label);
+  const auto& space_allocations = space_it->second;
+  const auto [first, last]      = space_allocations.equal_range(label);
   if (first == last) {
     return nullptr;
   }
