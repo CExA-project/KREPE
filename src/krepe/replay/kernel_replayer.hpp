@@ -530,8 +530,8 @@ std::vector<ReplayAllocation> get_allocations() {
                                               std::nullopt);
 }
 
-// Explicit dimensions/layout for structured comparisons. The caller must
-// synchronize the replay kernel before inspecting its results. Non-host
+// Explicit dimensions/layout for structured comparisons. The replay kernel
+// must have finished executing before calling this function. Non-host
 // captures are restored in CudaSpace/HIPSpace, including managed/pinned data.
 template <class DataType, class... Properties, class Tuple, class Functor>
 decltype(auto) compare_views(const ReplayAllocation& allocation, Tuple args,
