@@ -423,7 +423,7 @@ template <MemorySpaceType target_memory_space>
 herr_t get_hdf5_dataset_alloc_info(hid_t group, const char* name,
                                    const H5L_info_t*, void* allocation_set) {
   const SnapshotAllocation entry = read_allocation_info(group, name);
-  const auto space = memory_space_type_from_string(entry.space);
+  const auto space               = memory_space_type_from_string(entry.space);
   if (space != target_memory_space) {
     return 0;
   }
@@ -452,7 +452,7 @@ herr_t read_hdf5_metadata(hid_t group, const char* name, const H5A_info_t*,
 herr_t allocate_hdf5_dataset(hid_t group, const char* name, const H5L_info_t*,
                              void* allocate_fun) {
   const SnapshotAllocation entry = read_allocation_info(group, name);
-  auto& callback   = *static_cast<hdf5_iterate_fun_t*>(allocate_fun);
+  auto& callback = *static_cast<hdf5_iterate_fun_t*>(allocate_fun);
   if (entry.bytes_dumped) {
     check_byte_dataset(group, name, entry.size);
   }
