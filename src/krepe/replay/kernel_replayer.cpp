@@ -299,6 +299,7 @@ void iterate_allocations(hid_t file, const char* path, H5L_iterate_t callback,
     void* data;
     std::exception_ptr error;
   } context{callback, data, nullptr};
+
   const auto safe_callback = [](hid_t group, const char* name,
                                 const H5L_info_t* info,
                                 void* opaque) -> herr_t {
@@ -310,6 +311,7 @@ void iterate_allocations(hid_t file, const char* path, H5L_iterate_t callback,
       return -1;
     }
   };
+
   hsize_t idx = 0;
   const herr_t status =
       H5Literate_by_name(file, path, H5_INDEX_NAME, H5_ITER_NATIVE, &idx,
@@ -420,7 +422,7 @@ void check_byte_dataset(hid_t group, const char* name, std::size_t size) {
 template <MemorySpaceType target_memory_space>
 herr_t get_hdf5_dataset_alloc_info(hid_t group, const char* name,
                                    const H5L_info_t*, void* allocation_set) {
-  const auto entry = read_allocation_info(group, name);
+  const SnapshotAllocation entry = read_allocation_info(group, name);
   const auto space = memory_space_type_from_string(entry.space);
   if (space != target_memory_space) {
     return 0;
@@ -449,7 +451,7 @@ herr_t read_hdf5_metadata(hid_t group, const char* name, const H5A_info_t*,
 
 herr_t allocate_hdf5_dataset(hid_t group, const char* name, const H5L_info_t*,
                              void* allocate_fun) {
-  const auto entry = read_allocation_info(group, name);
+  const SnapshotAllocation entry = read_allocation_info(group, name);
   auto& callback   = *static_cast<hdf5_iterate_fun_t*>(allocate_fun);
   if (entry.bytes_dumped) {
     check_byte_dataset(group, name, entry.size);
