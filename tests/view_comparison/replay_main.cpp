@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
   const int N   = 1024;
-  using Triplet = Kokkos::Array<float, 3>;
+  using Triplet = Kokkos::Array<int, 3>;
   using Space   = Kokkos::DefaultExecutionSpace::memory_space;
   Kokkos::View<int*> values;
   Kokkos::View<Triplet*> triplets;
@@ -21,7 +21,7 @@ int main(int argc, char* argv[]) {
       "test_kernel", 0, KOKKOS_LAMBDA(int i) {
         values(i) *= 2;
         if (i == 0) {
-          for (int j = 0; j < 3; ++j) triplets(0)[j] += 1.0f;
+          for (int j = 0; j < 3; ++j) triplets(0)[j] += 1;
         }
       });
   Kokkos::fence();
@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
         Kokkos::create_mirror_view_and_copy(Kokkos::HostSpace(), actual);
     bool matches = true;
     for (int j = 0; j < 3; ++j) {
-      if (h_reference(0)[j] != float(j + 2)) {
+      if (h_reference(0)[j] != j + 2) {
         reference_unchanged = false;
       }
       if (h_actual(0)[j] != h_reference(0)[j]) {
@@ -84,7 +84,7 @@ int main(int argc, char* argv[]) {
                                         1);
   Kokkos::parallel_for(
       "modify_replayed_triplet", 1,
-      KOKKOS_LAMBDA(int) { replayed_triplet(0)[0] += 1.0f; });
+      KOKKOS_LAMBDA(int) { replayed_triplet(0)[0] += 1; });
   Kokkos::fence();
   const bool still_matches = krepe::compare_views<Triplet*, Space>(
       allocation, std::make_tuple(1), compare_triplets);
