@@ -70,7 +70,7 @@ using ReplayAllocations =
 
 std::vector<ReplayAllocation> get_allocations(
     MemorySpaceType memory_space, std::optional<std::string_view> label);
-std::vector<ReplayAllocation> get_allocations(
+std::vector<ReplayAllocation> get_allocations_for_space_name(
     std::string_view memory_space, std::optional<std::string_view> label);
 void validate_comparison(const ReplayAllocation& allocation,
                          std::string_view memory_space);
@@ -521,12 +521,13 @@ void compare_views(const std::string& label, Tuple args, Functor&& f) {
 // remain separate descriptors. Enumeration order is unspecified.
 template <class MemorySpace>
 std::vector<ReplayAllocation> get_allocations(const std::string& label) {
-  return impl::get_allocations(MemorySpace::name(), label);
+  return impl::get_allocations_for_space_name(MemorySpace::name(), label);
 }
 
 template <class MemorySpace>
 std::vector<ReplayAllocation> get_allocations() {
-  return impl::get_allocations(MemorySpace::name(), std::nullopt);
+  return impl::get_allocations_for_space_name(MemorySpace::name(),
+                                              std::nullopt);
 }
 
 // Explicit dimensions/layout for structured comparisons. The caller must

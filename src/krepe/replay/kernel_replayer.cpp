@@ -162,7 +162,7 @@ std::vector<ReplayAllocation> get_allocations(
   return result;
 }
 
-std::vector<ReplayAllocation> get_allocations(
+std::vector<ReplayAllocation> get_allocations_for_space_name(
     std::string_view memory_space, std::optional<std::string_view> label) {
   auto allocations =
       get_allocations(memory_space_type_from_string(memory_space), label);
