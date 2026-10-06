@@ -65,7 +65,11 @@ void device_init() {
   CUdevice cuDevice;
   CHECK_CUDA_CALL(cuDeviceGet(&cuDevice, 0));
   CUcontext ctx;
+#if CUDA_VERSION >= 13000
+  CHECK_CUDA_CALL(cuCtxCreate(&ctx, nullptr, 0, cuDevice));
+#else
   CHECK_CUDA_CALL(cuCtxCreate(&ctx, 0, cuDevice));
+#endif
 
   CHECK_CUDA_CALL(cuDeviceGetAttribute(
       &device_supports_virtual_address,
