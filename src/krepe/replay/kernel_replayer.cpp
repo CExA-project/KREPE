@@ -99,23 +99,20 @@ static std::vector<char> functor_data;
 static std::vector<char> nvcc_inner_lambda_data;
 
 namespace krepe::impl {
-void* copy_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                        std::size_t inner_lambda_size) {
-  assert(inner_lambda_size == nvcc_inner_lambda_data.size());
-
-  void* inner_lambda_save = std::malloc(inner_lambda_size);
-  std::memcpy(inner_lambda_save, inner_lambda_ptr, inner_lambda_size);
-  std::memcpy(inner_lambda_ptr, nvcc_inner_lambda_data.data(),
-              inner_lambda_size);
-
-  return inner_lambda_save;
-}
-
-void restore_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                          void* inner_lambda_save) {
-  std::memcpy(inner_lambda_ptr, inner_lambda_save,
-              nvcc_inner_lambda_data.size());
-  std::free(inner_lambda_save);
+void init_extended_lambda_host_closure(void* buffer, std::size_t size,
+                                       std::size_t offset,
+                                       std::size_t total_size) {
+  if (total_size != nvcc_inner_lambda_data.size()) {
+    throw std::runtime_error(
+        "The stored NVCC host closures have a different total size, expected " +
+        std::to_string(total_size) + "B, got " +
+        std::to_string(nvcc_inner_lambda_data.size()) +
+        "B. Recapture the kernel with the current extractor.");
+  }
+  if (offset > total_size || size > total_size - offset) {
+    throw std::runtime_error("The NVCC host closure exceeds the stored data");
+  }
+  std::memcpy(buffer, nvcc_inner_lambda_data.data() + offset, size);
 }
 }  // namespace krepe::impl
 

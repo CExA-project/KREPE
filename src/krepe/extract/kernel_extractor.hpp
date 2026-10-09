@@ -5,7 +5,9 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
+#include <vector>
 #include <Kokkos_Core.hpp>
 #include <krepe/common/extended_lambda_utils.hpp>
 
@@ -20,6 +22,24 @@ void copy_functor(const unsigned char* functor_data, std::size_t functor_size);
 void copy_functor(const unsigned char* functor_data, std::size_t functor_size,
                   const unsigned char* inner_functor_data,
                   std::size_t inner_functor_size);
+
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+template <class Functor>
+void copy_nvcc_functor(const Functor& functor) {
+  std::vector<unsigned char> host_closure_data;
+  auto copy_host_closure = [&](const void*, void**, void* buffer,
+                               std::size_t size) {
+    const auto offset = host_closure_data.size();
+    host_closure_data.resize(offset + size);
+    std::memcpy(host_closure_data.data() + offset, buffer, size);
+  };
+  krepe::hdl_utils::visit_hdl_host_lambdas(functor, copy_host_closure);
+  copy_functor(reinterpret_cast<const unsigned char*>(&functor),
+               sizeof(functor), host_closure_data.data(),
+               host_closure_data.size());
+}
+#endif
+
 void register_scalar_policy(std::uint64_t N);
 void register_range_policy(const char* space, const char* schedule,
                            std::size_t index_type_size, bool index_type_signed,
@@ -171,11 +191,7 @@ template <class Functor>
 Functor replay_functor(Functor&& functor) {
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
   if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::copy_functor(reinterpret_cast<const unsigned char*>(&functor),
-                       sizeof(functor),
-                       reinterpret_cast<const unsigned char*>(
-                           krepe::hdl_utils::hdl_host_lambda_pointer(functor)),
-                       krepe::hdl_utils::hdl_host_lambda_size(functor));
+    impl::copy_nvcc_functor(functor);
   } else
 #endif
   {
