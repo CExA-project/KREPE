@@ -40,13 +40,75 @@ struct ReplayAllocation {
 namespace impl {
 
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-void* copy_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                        std::size_t inner_lambda_size);
-void restore_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                          void* inner_lambda_save);
+void init_extended_lambda_host_closure(void* buffer, std::size_t size,
+                                       std::size_t offset,
+                                       std::size_t total_size);
 #endif
 
 void init_functor(char* buffer, std::size_t size);
+
+// Keep every temporary host closure alive at its original address while its
+// captures are patched, then restore its bytes before the functor is destroyed.
+class FunctorRestore {
+  void* storage_;
+  std::vector<char> original_;
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+  struct HostClosure {
+    void** pointer_slot;
+    void* buffer;
+    std::vector<char> original;
+  };
+  std::vector<HostClosure> host_closures_;
+#endif
+
+ public:
+  template <class Functor>
+  explicit FunctorRestore(Functor& functor)
+      : storage_(&functor), original_(sizeof(Functor)) {
+    std::memcpy(original_.data(), storage_, original_.size());
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    if constexpr (hdl_utils::lambda_is_hdl<Functor>()) {
+      auto save = [&](const void*, void** pointer_slot, void* buffer,
+                      std::size_t size) {
+        HostClosure closure{pointer_slot, buffer, std::vector<char>(size)};
+        std::memcpy(closure.original.data(), buffer, size);
+        host_closures_.push_back(std::move(closure));
+      };
+      hdl_utils::visit_hdl_host_lambdas(functor, save);
+    }
+#endif
+  }
+
+  FunctorRestore(const FunctorRestore&)            = delete;
+  FunctorRestore& operator=(const FunctorRestore&) = delete;
+
+  void init() {
+    init_functor(static_cast<char*>(storage_), original_.size());
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    std::size_t total_size = 0;
+    for (const auto& closure : host_closures_) {
+      total_size += closure.original.size();
+    }
+    std::size_t offset = 0;
+    for (auto& closure : host_closures_) {
+      std::memcpy(closure.pointer_slot, &closure.buffer, sizeof(void*));
+      init_extended_lambda_host_closure(closure.buffer, closure.original.size(),
+                                        offset, total_size);
+      offset += closure.original.size();
+    }
+#endif
+  }
+
+  ~FunctorRestore() {
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    for (auto it = host_closures_.rbegin(); it != host_closures_.rend(); ++it) {
+      std::memcpy(it->buffer, it->original.data(), it->original.size());
+    }
+#endif
+    std::memcpy(storage_, original_.data(), original_.size());
+  }
+};
+
 void* get_allocation(impl::MemorySpaceType memory_space,
                      const std::string& label);
 void* get_out_allocation(impl::MemorySpaceType memory_space,
@@ -577,8 +639,6 @@ decltype(auto) compare_views(const ReplayAllocation& allocation, Functor&& f) {
 
 template <class Functor>
 Functor replay_functor(const Functor& functor) {
-  constexpr int N = sizeof(Functor);
-
   // In order to revive the to-be-replayed functor, we:
   // - Create a temporary functor and copy construct it from an existing
   //   functor (we have to use the copy constructor since its the only valid
@@ -590,44 +650,16 @@ Functor replay_functor(const Functor& functor) {
   //   a segfault once they are destroyed
   // - memcpy the old data of the temporary functor back and properly destroy it
   // - return f
-  Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_disable();
-
-  void* dummy_functor_storage = std::aligned_alloc(alignof(Functor), N);
-  Functor* dummy_functor      = new (dummy_functor_storage) Functor(functor);
-  void* dummy_functor_buffer_save = std::malloc(N);
-  std::memcpy(dummy_functor_buffer_save, dummy_functor_storage, N);
-
-#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-  [[maybe_unused]] void* inner_lambda_ptr  = nullptr;
-  [[maybe_unused]] void* inner_lambda_save = nullptr;
-  if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::init_functor(static_cast<char*>(dummy_functor_storage),
-                       N - sizeof(void*));
-    inner_lambda_ptr =
-        krepe::hdl_utils::hdl_host_lambda_pointer(*dummy_functor);
-    inner_lambda_save = impl::copy_extended_lambda_inner_lambda(
-        inner_lambda_ptr,
-        krepe::hdl_utils::hdl_host_lambda_size(*dummy_functor));
-  } else
-#endif
-  {
-    impl::init_functor(static_cast<char*>(dummy_functor_storage), N);
+  std::optional<Kokkos::Impl::SharedAllocationDisableTrackingGuard> tracking;
+  if (Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_enabled()) {
+    tracking.emplace();
   }
-  Functor f(*dummy_functor);
-
-  std::memcpy(dummy_functor_storage, dummy_functor_buffer_save, N);
-  std::free(dummy_functor_buffer_save);
-#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-  if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::restore_extended_lambda_inner_lambda(inner_lambda_ptr,
-                                               inner_lambda_save);
-  }
-#endif
-  dummy_functor->~Functor();
-  std::free(dummy_functor_storage);
-
-  Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_enable();
-
+  Functor dummy_functor(functor);
+  impl::FunctorRestore restore(dummy_functor);
+  restore.init();
+  // The return value is constructed before restore and dummy_functor are
+  // destroyed, including when NVCC recursively copies captured host closures.
+  Functor f(dummy_functor);
   return f;
 }
 
