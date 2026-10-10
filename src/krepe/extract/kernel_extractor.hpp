@@ -5,7 +5,6 @@
 
 #include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <string>
 #include <vector>
 #include <Kokkos_Core.hpp>
@@ -29,9 +28,8 @@ void copy_nvcc_functor(const Functor& functor) {
   std::vector<unsigned char> host_closure_data;
   auto copy_host_closure = [&](const void*, void**, void* buffer,
                                std::size_t size) {
-    const auto offset = host_closure_data.size();
-    host_closure_data.resize(offset + size);
-    std::memcpy(host_closure_data.data() + offset, buffer, size);
+    const auto* bytes = static_cast<const unsigned char*>(buffer);
+    host_closure_data.insert(host_closure_data.end(), bytes, bytes + size);
   };
   krepe::hdl_utils::visit_hdl_host_lambdas(functor, copy_host_closure);
   copy_functor(reinterpret_cast<const unsigned char*>(&functor),
