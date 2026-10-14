@@ -4,6 +4,7 @@
 #pragma once
 
 #include <cassert>
+#include <cstddef>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
@@ -46,7 +47,7 @@ void restore_extended_lambda_inner_lambda(void* inner_lambda_ptr,
                                           void* inner_lambda_save);
 #endif
 
-void init_functor(char* buffer, std::size_t size);
+void init_functor(std::byte* buffer, std::size_t size);
 void* get_allocation(impl::MemorySpaceType memory_space,
                      const std::string& label);
 void* get_out_allocation(impl::MemorySpaceType memory_space,
@@ -58,7 +59,7 @@ const ReplayAllocation* get_unique_allocation(MemorySpaceType memory_space,
 
 struct SnapshotAllocation;
 struct StoredAllocation {
-  char* captured_allocation;
+  std::byte* captured_allocation;
   ReplayAllocation descriptor;
   bool output_seen = false;
   std::unique_ptr<void, void (*)(void*)> reference{nullptr, nullptr};
@@ -419,8 +420,8 @@ class ScopeGuard {
  private:
   struct InputSnapshot {
     impl::MemorySpaceType memory_space;
-    char* address;
-    std::vector<char> data;
+    std::byte* address;
+    std::vector<std::byte> data;
   };
 
   bool enable_input_reset_;
@@ -431,11 +432,12 @@ class ScopeGuard {
   std::vector<impl::Allocation> device_raw_allocations;
 #endif
 
-  void allocate(impl::MemorySpaceType memory_space, char* address,
+  void allocate(impl::MemorySpaceType memory_space, std::byte* address,
                 std::size_t size);
 
   void allocate_output(impl::StoredAllocation& allocation,
-                       const impl::SnapshotAllocation& snapshot, char* data);
+                       const impl::SnapshotAllocation& snapshot,
+                       const std::byte* data);
 
  public:
   // Enabling input reset keeps a host copy of all input allocation bytes.
@@ -601,7 +603,7 @@ Functor replay_functor(const Functor& functor) {
   [[maybe_unused]] void* inner_lambda_ptr  = nullptr;
   [[maybe_unused]] void* inner_lambda_save = nullptr;
   if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::init_functor(static_cast<char*>(dummy_functor_storage),
+    impl::init_functor(static_cast<std::byte*>(dummy_functor_storage),
                        N - sizeof(void*));
     inner_lambda_ptr =
         krepe::hdl_utils::hdl_host_lambda_pointer(*dummy_functor);
@@ -611,7 +613,7 @@ Functor replay_functor(const Functor& functor) {
   } else
 #endif
   {
-    impl::init_functor(static_cast<char*>(dummy_functor_storage), N);
+    impl::init_functor(static_cast<std::byte*>(dummy_functor_storage), N);
   }
   Functor f(*dummy_functor);
 

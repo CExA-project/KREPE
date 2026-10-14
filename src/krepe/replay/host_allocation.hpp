@@ -14,7 +14,7 @@
 
 namespace krepe::impl {
 
-inline auto regular_host_allocate(std::size_t size, char* data) {
+inline auto regular_host_allocate(std::size_t size, const std::byte* data) {
   void* ptr = std::malloc(size);
   std::memcpy(ptr, data, size);
   return std::unique_ptr<void, void (*)(void*)>(ptr, std::free);
@@ -22,7 +22,8 @@ inline auto regular_host_allocate(std::size_t size, char* data) {
 
 inline std::size_t host_allocation_granularity() { return getpagesize(); }
 
-inline void host_copy_data(char* address, char* data, std::size_t size) {
+inline void host_copy_data(std::byte* address, const std::byte* data,
+                           std::size_t size) {
   std::memcpy(address, data, size);
 }
 
