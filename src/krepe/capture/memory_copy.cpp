@@ -3,6 +3,7 @@
 
 #include "memory_copy.hpp"
 
+#include <cstddef>
 #include <cstring>
 #include <exception>
 #include <limits>
@@ -32,7 +33,7 @@ bool is_cuda_device_space(const std::string& space) { return space == "Cuda"; }
 bool is_hip_device_space(const std::string& space) { return space == "HIP"; }
 
 std::string allocate_staging_buffer(const ActiveAllocation& allocation,
-                                    std::vector<unsigned char>& bytes) {
+                                    std::vector<std::byte>& bytes) {
   try {
     bytes.resize(static_cast<std::size_t>(allocation.record.size));
   } catch (const std::exception& error) {
@@ -46,7 +47,7 @@ std::string allocate_staging_buffer(const ActiveAllocation& allocation,
 }  // namespace
 
 std::string copy_allocation_bytes(const ActiveAllocation& allocation,
-                                  std::vector<unsigned char>& bytes) {
+                                  std::vector<std::byte>& bytes) {
   if (!allocation.record.data_size_known) {
     return "allocation data size could not be bounded safely";
   }

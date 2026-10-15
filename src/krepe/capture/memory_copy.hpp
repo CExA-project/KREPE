@@ -5,12 +5,13 @@
 
 #include "allocation_tracker.hpp"
 
+#include <cstddef>
 #include <string>
 #include <vector>
 
 namespace krepe {
 
 std::string copy_allocation_bytes(const ActiveAllocation& allocation,
-                                  std::vector<unsigned char>& bytes);
+                                  std::vector<std::byte>& bytes);
 
 }  // namespace krepe
