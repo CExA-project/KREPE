@@ -39,7 +39,7 @@ inline std::pair<std::byte*, std::size_t> get_allocation_address(
   }
 
   std::byte* aligned_address = reinterpret_cast<std::byte*>(
-      ((reinterpret_cast<std::uintptr_t>(target_address)) / granularity) *
+      ((static_cast<std::uintptr_t>(target_address)) / granularity) *
       granularity);
   size += static_cast<std::byte*>(target_address) - aligned_address;
 
