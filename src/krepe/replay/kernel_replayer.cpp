@@ -34,8 +34,8 @@ void remove_cli_args(int& argc, char* argv[], int pos, int n) {
   argc -= n;
 }
 
-std::string_view find_flag_argument(int& argc, char* argv[],
-                                    std::string_view flag) {
+std::string_view find_cli_option(int& argc, char* argv[],
+                                 std::string_view flag) {
   std::string_view argument;
   for (int i = 1; i < argc; i++) {
     std::string_view current_arg{argv[i]};
@@ -60,6 +60,17 @@ std::string_view find_flag_argument(int& argc, char* argv[],
   }
 
   return argument;
+}
+
+bool find_cli_flag(int& argc, char* argv[], std::string_view flag) {
+  for (int i = 1; i < argc; i++) {
+    if (argv[i] == flag) {
+      remove_cli_args(argc, argv, i, 1);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void device_init() {
@@ -128,6 +139,13 @@ namespace impl {
 
 static const ReplayAllocations* replay_allocations = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
+static bool krepe_is_initialized = false;
+static bool input_reset_enabled  = false;
+// ScopeGuard used internally by krepe::initialize and krepe::finalize
+static std::unique_ptr<ScopeGuard> initialize_internal_scope_guard;
+// Pointer to the ScopeGuard that was either created by the user or by
+// krepe::initialize
+static ScopeGuard* scope_guard = nullptr;
 
 static void check_replay_allocations(
     [[maybe_unused]] MemorySpaceType memory_space) {
@@ -749,10 +767,17 @@ std::vector<std::pair<std::byte*, std::size_t>> compute_allocations(
 }
 }  // namespace impl
 
-ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
-    : enable_input_reset_(enable_input_reset) {
+ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
+  if (impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Constructing a ScopeGuard but krepe has already been initialized");
+  }
+
+  impl::input_reset_enabled =
+      find_cli_flag(argc, argv, "--kernel-replayer-enable-input-reset");
+
   std::string_view hdf5_filename =
-      find_flag_argument(argc, argv, "--kernel-replayer-dump");
+      find_cli_option(argc, argv, "--kernel-replayer-dump");
   if (hdf5_filename.data() == nullptr) {
     throw std::runtime_error(
         "The kernel replayer expects the flag --kernel-replayer-dump");
@@ -814,7 +839,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
         const auto space = impl::memory_space_type_from_string(entry.space);
         if (entry.size != 0) {
           impl::copy_data(space, entry.address, data, entry.size);
-          if (enable_input_reset_) {
+          if (impl::input_reset_enabled) {
             input_snapshots_.push_back(
                 {space, entry.address,
                  std::vector<std::byte>(data, data + entry.size)});
@@ -872,19 +897,26 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
   file.close_checked();
 
   impl::replay_allocations = &replay_allocations_;
+
+  impl::krepe_is_initialized = true;
+  impl::scope_guard          = this;
 }
 
 ScopeGuard::~ScopeGuard() {
   if (impl::replay_allocations == &replay_allocations_) {
     impl::replay_allocations = nullptr;
   }
+  impl::scope_guard = nullptr;
 }
 
 void ScopeGuard::reset_inputs() {
-  if (!enable_input_reset_) {
+  if (!impl::input_reset_enabled) {
     throw std::runtime_error(
-        "Input reset must be enabled when constructing krepe::ScopeGuard");
+        "Input reset must be enabled via the "
+        "--kernel-replayer-enable-input-reset flag in order to be able to call "
+        "krepe::reset_inputs()");
   }
+  // FIXME: remove once the scopeguard requires kokkos to be initialized
   if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
     throw std::runtime_error(
         "reset_inputs can be called only inside Kokkos execution environment");
@@ -946,6 +978,48 @@ void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
 #endif
   }
   descriptor.reference_data = allocation.reference.get();
+}
+
+void initialize(int& argc, char* argv[]) {
+  if (impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Trying to initialize krepe, but it has already been initialized");
+  }
+
+  impl::initialize_internal_scope_guard =
+      std::make_unique<ScopeGuard>(argc, argv);
+}
+
+void finalize() {
+  if (!impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Trying to finalize krepe, but it has not been initialized");
+  }
+
+  // if the internal ScopeGuard is null, either krepe has been initialized by
+  // the user constructing a ScopeGuard (in which case impl::scope_guard is
+  // non-null) or krepe has already been finalized (impl::scope_guard is null)
+  if (!impl::initialize_internal_scope_guard) {
+    if (impl::scope_guard) {
+      throw std::runtime_error(
+          "Trying to call krepe::finalize, but krepe has been initialized by a "
+          "ScopeGuard");
+    } else {
+      throw std::runtime_error(
+          "Trying to call krepe::finalize, but krepe has already been "
+          "finalized");
+    }
+  }
+
+  impl::initialize_internal_scope_guard.reset();
+}
+
+void reset_inputs() {
+  if (!impl::krepe_is_initialized) {
+    throw std::runtime_error("krepe::reset_inputs(): krepe is not initialized");
+  }
+
+  impl::scope_guard->reset_inputs();
 }
 
 }  // namespace krepe
