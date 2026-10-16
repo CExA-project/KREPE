@@ -17,24 +17,23 @@ struct scratch_description {
   int level1;
 };
 
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size);
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size,
-                  const unsigned char* inner_functor_data,
+void copy_functor(const std::byte* functor_data, std::size_t functor_size);
+void copy_functor(const std::byte* functor_data, std::size_t functor_size,
+                  const std::byte* inner_functor_data,
                   std::size_t inner_functor_size);
 
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
 template <class Functor>
 void copy_nvcc_functor(const Functor& functor) {
-  std::vector<unsigned char> host_closure_data;
+  std::vector<std::byte> host_closure_data;
   auto copy_host_closure = [&](const void*, void**, void* buffer,
                                std::size_t size) {
-    const auto* bytes = static_cast<const unsigned char*>(buffer);
+    const auto* bytes = static_cast<const std::byte*>(buffer);
     host_closure_data.insert(host_closure_data.end(), bytes, bytes + size);
   };
   krepe::hdl_utils::visit_hdl_host_lambdas(functor, copy_host_closure);
-  copy_functor(reinterpret_cast<const unsigned char*>(&functor),
-               sizeof(functor), host_closure_data.data(),
-               host_closure_data.size());
+  copy_functor(reinterpret_cast<const std::byte*>(&functor), sizeof(functor),
+               host_closure_data.data(), host_closure_data.size());
 }
 #endif
 
@@ -193,7 +192,7 @@ Functor replay_functor(Functor&& functor) {
   } else
 #endif
   {
-    impl::copy_functor(reinterpret_cast<const unsigned char*>(&functor),
+    impl::copy_functor(reinterpret_cast<const std::byte*>(&functor),
                        sizeof(Functor));
   }
   return functor;

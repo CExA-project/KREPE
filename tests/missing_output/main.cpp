@@ -5,6 +5,7 @@
 
 #include <Kokkos_Core.hpp>
 
+#include <cstddef>
 #include <cstring>
 #include <vector>
 
@@ -33,7 +34,7 @@ int main(int argc, char* argv[]) {
   };
 
   const MultiplyFunctor functor{2, values};
-  std::vector<unsigned char> functor_data(sizeof(functor));
+  std::vector<std::byte> functor_data(sizeof(functor));
   std::memcpy(functor_data.data(), &functor, sizeof(functor));
 
   const auto dump = krepe::create_kernel_dump(input_snapshot, functor_data, {},

@@ -4,6 +4,7 @@
 #include <Kokkos_Core.hpp>
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <exception>
 #include <iterator>
 #include <map>
@@ -94,9 +95,9 @@ void device_init() {
   }
 }
 
-static std::vector<char> functor_data;
+static std::vector<std::byte> functor_data;
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-static std::vector<char> nvcc_inner_lambda_data;
+static std::vector<std::byte> nvcc_inner_lambda_data;
 
 namespace krepe::impl {
 void init_extended_lambda_host_closure(void* buffer, std::size_t size,
@@ -247,7 +248,7 @@ void validate_comparison(const ReplayAllocation& allocation,
   }
 }
 
-void init_functor(char* buffer, std::size_t size) {
+void init_functor(std::byte* buffer, std::size_t size) {
   if (functor_data.size() < size) {
     throw std::runtime_error(
         "The stored functor is smaller than the requested functor, expected at "
@@ -258,9 +259,9 @@ void init_functor(char* buffer, std::size_t size) {
   std::memcpy(buffer, functor_data.data(), size);
 }
 
-char* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
+std::byte* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
   if (mem == MemorySpaceType::HOST) {
-    return new char[size];
+    return new std::byte[size];
   } else {
     void* ptr = nullptr;
 #if defined(KOKKOS_ENABLE_CUDA)
@@ -268,11 +269,11 @@ char* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
 #elif defined(KOKKOS_ENABLE_HIP)
     KOKKOS_IMPL_HIP_SAFE_CALL(hipHostMalloc(&ptr, size));
 #endif
-    return static_cast<char*>(ptr);
+    return static_cast<std::byte*>(ptr);
   }
 }
 
-void free_host_buffer(char* ptr, MemorySpaceType mem) {
+void free_host_buffer(std::byte* ptr, MemorySpaceType mem) {
   if (mem == MemorySpaceType::HOST) {
     delete[] ptr;
   } else {
@@ -287,14 +288,14 @@ void free_host_buffer(char* ptr, MemorySpaceType mem) {
 struct SnapshotAllocation {
   std::string label;
   std::string space;
-  char* allocation_id;
-  char* address;
+  std::byte* allocation_id;
+  std::byte* address;
   std::size_t size;
   bool bytes_dumped;
 };
 
 using hdf5_iterate_fun_t =
-    std::function<void(const SnapshotAllocation&, char*)>;
+    std::function<void(const SnapshotAllocation&, const std::byte*)>;
 
 void iterate_allocations(hid_t file, const char* path, H5L_iterate_t callback,
                          void* data) {
@@ -392,7 +393,7 @@ std::uint64_t get_hdf5_uint64_attribute(hid_t group, const char* name,
 
 SnapshotAllocation read_allocation_info(hid_t group, const char* name) {
   const auto pointer_attribute = [&](const char* attribute) {
-    return reinterpret_cast<char*>(std::stoull(
+    return reinterpret_cast<std::byte*>(std::stoull(
         get_hdf5_string_attribute(group, name, attribute), nullptr, 16));
   };
   const auto size = get_hdf5_uint64_attribute(group, name, "size");
@@ -439,7 +440,8 @@ herr_t get_hdf5_dataset_alloc_info(hid_t group, const char* name,
   check_byte_dataset(group, name, entry.size);
   if (entry.size != 0) {
     auto& allocations =
-        *static_cast<std::set<std::pair<char*, std::size_t>>*>(allocation_set);
+        *static_cast<std::set<std::pair<std::byte*, std::size_t>>*>(
+            allocation_set);
     allocations.insert(
         get_allocation_address(entry.address, entry.size, space));
   }
@@ -467,8 +469,10 @@ herr_t allocate_hdf5_dataset(hid_t group, const char* name, const H5L_info_t*,
   }
 
   const auto space       = memory_space_type_from_string(entry.space);
-  const auto free_buffer = [space](char* ptr) { free_host_buffer(ptr, space); };
-  std::unique_ptr<char, decltype(free_buffer)> buffer(
+  const auto free_buffer = [space](std::byte* ptr) {
+    free_host_buffer(ptr, space);
+  };
+  std::unique_ptr<std::byte, decltype(free_buffer)> buffer(
       allocate_host_buffer(entry.size, space), free_buffer);
   const std::string dataset = std::string(name) + "/bytes";
   CHECK_HDF5_CALL(
@@ -487,7 +491,7 @@ void read_functor_from_hdf5(hid_t file) {
   std::size_t datatype_size;
   CHECK_HDF5_CALL(H5LTget_dataset_info(file, "functor/functor", &dim, &datatype,
                                        &datatype_size));
-  // We only deal with arrays of chars
+  // We only deal with arrays of bytes
   assert(datatype == H5T_INTEGER);
   assert(datatype_size == 1);
 
@@ -715,13 +719,13 @@ void read_policy_from_hdf5(hid_t file) {
   }
 }
 
-std::vector<std::pair<char*, std::size_t>> compute_allocations(
-    const std::set<std::pair<char*, std::size_t>>& allocations) {
+std::vector<std::pair<std::byte*, std::size_t>> compute_allocations(
+    const std::set<std::pair<std::byte*, std::size_t>>& allocations) {
   if (allocations.empty()) {
     return {};
   }
 
-  std::vector<std::pair<char*, std::size_t>> allocs;
+  std::vector<std::pair<std::byte*, std::size_t>> allocs;
   auto it                              = allocations.begin();
   auto [current_address, current_size] = *(it++);
   for (; it != allocations.end(); ++it) {
@@ -755,7 +759,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
       CHECK_HDF5_ID(H5Fopen(hdf5_filename.data(), H5F_ACC_RDONLY, H5P_DEFAULT)),
       H5Fclose);
 
-  std::set<std::pair<char*, std::size_t>> host_allocation_locs;
+  std::set<std::pair<std::byte*, std::size_t>> host_allocation_locs;
 
   impl::iterate_allocations(
       file.get(), "in/views",
@@ -772,7 +776,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
   // we do it after doing the host allocations
   device_init();
 
-  std::set<std::pair<char*, std::size_t>> device_allocation_locs;
+  std::set<std::pair<std::byte*, std::size_t>> device_allocation_locs;
 
   impl::iterate_allocations(
       file.get(), "in/views",
@@ -788,12 +792,12 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
-  std::map<std::pair<char*, std::string>, impl::StoredAllocation*>
+  std::map<std::pair<std::byte*, std::string>, impl::StoredAllocation*>
       allocation_index;
 
   impl::hdf5_iterate_fun_t copy_data_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
-                                char* data) {
+                                const std::byte* data) {
         if (!entry.bytes_dumped) {
           throw std::runtime_error("Missing input bytes for allocation '" +
                                    entry.label + "'");
@@ -810,7 +814,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
           if (enable_input_reset_) {
             input_snapshots_.push_back(
                 {space, entry.address,
-                 std::vector<char>(data, data + entry.size)});
+                 std::vector<std::byte>(data, data + entry.size)});
           }
         }
         const auto allocation = replay_allocations_[space].emplace(
@@ -840,7 +844,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
 
   impl::hdf5_iterate_fun_t allocate_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
-                                char* data) {
+                                const std::byte* data) {
         const auto it = allocation_index.find(
             std::make_pair(entry.allocation_id, entry.space));
         if (it == allocation_index.end()) {
@@ -899,8 +903,8 @@ std::optional<std::string> get_metadata(const std::string& key) {
   }
 }
 
-void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
-                          std::size_t size) {
+void ScopeGuard::allocate(impl::MemorySpaceType memory_space,
+                          std::byte* address, std::size_t size) {
   if (memory_space == impl::MemorySpaceType::HOST) {
     host_raw_allocations.emplace_back(memory_space, address, size);
   } else {
@@ -915,7 +919,7 @@ void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
 
 void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
                                  const impl::SnapshotAllocation& snapshot,
-                                 char* data) {
+                                 const std::byte* data) {
   if (allocation.output_seen || allocation.descriptor.label != snapshot.label) {
     throw std::runtime_error("Duplicate or inconsistent output allocation '" +
                              snapshot.label + "'");

@@ -107,7 +107,7 @@ template <class... Fields, class Visitor>
 void visit_hdl_captures(const void* storage, Visitor& visitor) {
   if constexpr (sizeof...(Fields) > 0) {
     std::size_t offset     = 0;
-    const auto* bytes      = static_cast<const unsigned char*>(storage);
+    const auto* bytes      = static_cast<const std::byte*>(storage);
     const auto visit_field = [&]<class Field>() {
       offset = align_offset(offset, alignof(Field));
       if constexpr (lambda_is_hdl<Field>()) {
