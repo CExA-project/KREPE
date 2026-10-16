@@ -139,8 +139,9 @@ path to your llvm installation when configuring using
 Once the program dump has been generated, the kernel can be replayed in a
 separate program. The new program should include the parallel construct call as
 well as the functor declaration from the original program and any variable it
-depends on. The replayer should also be initialized before Kokkos, using
-`krepe::ScopeGuard`.
+depends on. In the replayed program, KREPE should be initialized after and
+finalized before Kokkos, KREPE can be initialized using either
+`krepe::initialize/finalize` or `krepe::ScopeGuard`.
 
 The program above becomes
 ```cpp
@@ -149,23 +150,27 @@ The program above becomes
 #include <krepe/replayer.hpp>  // <krepe/extractor.hpp> -> <krepe/replayer.hpp>
 
 int main(int argc, char* argv[]) {
-  // We initialize the replayer before Kokkos
-  krepe::ScopeGuard replay_scope(argc, argv);
-  Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  // We initialize Kokkos before krepe
+  Kokkos::initialize(argc, argv);
+  krepe::initialize(argc, argv);
+  {
+    // The execution policy could be ignored, as it will be restored from the dump
+    const int N = 1024;
+    // We don't care about the values inside the view, we only need it to have the
+    // same type as in the original program
+    Kokkos::View<int*> values;
+    // No need to initialize, the initialized view from the original program is
+    // captured in the dump Kokkos::parallel_for(
+    //     "init", values.size(), KOKKOS_LAMBDA(int i) { values(i) = i; });
 
-  // The execution policy could be ignored, as it will be restored from the dump
-  const int N = 1024;
-  // We don't care about the values inside the view, we only need it to have the
-  // same type as in the original program
-  Kokkos::View<int*> values;
-  // No need to initialize, the initialized view from the original program is
-  // captured in the dump Kokkos::parallel_for(
-  //     "init", values.size(), KOKKOS_LAMBDA(int i) { values(i) = i; });
-
-  // we still replace with krepe::parallel_for
-  krepe::parallel_for(
-      "scale", N, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
-  Kokkos::fence();
+    // we still replace with krepe::parallel_for
+    krepe::parallel_for(
+        "scale", N, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
+    Kokkos::fence();
+  }
+  // We finalize krepe before kokkos
+  krepe::finalize();
+  Kokkos::finalize();
 
   return 0;
 }
