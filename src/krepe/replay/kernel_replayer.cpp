@@ -140,6 +140,7 @@ namespace impl {
 static const ReplayAllocations* replay_allocations = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
 static bool krepe_is_initialized = false;
+static bool krepe_is_finalized   = false;
 static bool input_reset_enabled  = false;
 // ScopeGuard used internally by krepe::initialize and krepe::finalize
 static std::unique_ptr<ScopeGuard> initialize_internal_scope_guard;
@@ -773,6 +774,11 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
         "Constructing a ScopeGuard but krepe has already been initialized");
   }
 
+  if (!Kokkos::is_initialized()) {
+    throw std::runtime_error(
+        "Initializing krepe but kokkos has not yet been initialized");
+  }
+
   impl::input_reset_enabled =
       find_cli_flag(argc, argv, "--kernel-replayer-enable-input-reset");
 
@@ -900,13 +906,24 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
 
   impl::krepe_is_initialized = true;
   impl::scope_guard          = this;
+
+  // We use a finalize_hook to check if kokkos is finalized after krepe in order
+  // to not throw an exception inside ScopeGuard's destructor
+  Kokkos::push_finalize_hook([&]() {
+    if (!impl::krepe_is_finalized) {
+      throw std::runtime_error(
+          "Kokkos should be finalized after krepe is finalized");
+    }
+  });
 }
 
 ScopeGuard::~ScopeGuard() {
   if (impl::replay_allocations == &replay_allocations_) {
     impl::replay_allocations = nullptr;
   }
-  impl::scope_guard = nullptr;
+  impl::scope_guard          = nullptr;
+  impl::krepe_is_initialized = false;
+  impl::krepe_is_finalized   = true;
 }
 
 void ScopeGuard::reset_inputs() {
@@ -915,11 +932,6 @@ void ScopeGuard::reset_inputs() {
         "Input reset must be enabled via the "
         "--kernel-replayer-enable-input-reset flag in order to be able to call "
         "krepe::reset_inputs()");
-  }
-  // FIXME: remove once the scopeguard requires kokkos to be initialized
-  if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
-    throw std::runtime_error(
-        "reset_inputs can be called only inside Kokkos execution environment");
   }
 
   Kokkos::fence("KREPE before resetting inputs");
@@ -991,24 +1003,20 @@ void initialize(int& argc, char* argv[]) {
 }
 
 void finalize() {
+  if (impl::krepe_is_finalized) {
+    throw std::runtime_error(
+        "Trying to finalize krepe, but it has already been finalized");
+  }
+
   if (!impl::krepe_is_initialized) {
     throw std::runtime_error(
         "Trying to finalize krepe, but it has not been initialized");
   }
 
-  // if the internal ScopeGuard is null, either krepe has been initialized by
-  // the user constructing a ScopeGuard (in which case impl::scope_guard is
-  // non-null) or krepe has already been finalized (impl::scope_guard is null)
   if (!impl::initialize_internal_scope_guard) {
-    if (impl::scope_guard) {
-      throw std::runtime_error(
-          "Trying to call krepe::finalize, but krepe has been initialized by a "
-          "ScopeGuard");
-    } else {
-      throw std::runtime_error(
-          "Trying to call krepe::finalize, but krepe has already been "
-          "finalized");
-    }
+    throw std::runtime_error(
+        "Trying to call krepe::finalize, but krepe has been initialized by a "
+        "ScopeGuard");
   }
 
   impl::initialize_internal_scope_guard.reset();
