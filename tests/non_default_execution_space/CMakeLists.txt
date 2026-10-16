@@ -9,4 +9,4 @@ target_link_libraries(
 add_executable(non_default_execution_space_replay replay_main.cpp)
 target_link_libraries(non_default_execution_space_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(non_default_execution_space FALSE)
+add_replay_test(non_default_execution_space)

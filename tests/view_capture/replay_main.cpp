@@ -6,12 +6,12 @@
 #include <krepe/replayer.hpp>
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv);
 
   bool rejected = false;
   try {
-    replay_scope.reset_inputs();
+    krepe::reset_inputs();
   } catch (const std::runtime_error&) {
     rejected = true;
   }

@@ -7,4 +7,4 @@ target_link_libraries(metadata PRIVATE krepe_warnings krepe_sanitizers Kokkos::k
 add_executable(metadata_replay replay_main.cpp)
 target_link_libraries(metadata_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized)
 
-add_replay_test(metadata TRUE)
+add_replay_test(metadata COMPARE_OUTPUT)

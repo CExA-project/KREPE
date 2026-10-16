@@ -9,4 +9,4 @@ target_link_libraries(
   scalar_capture_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized
 )
 
-add_replay_test(scalar_capture TRUE)
+add_replay_test(scalar_capture COMPARE_OUTPUT)
