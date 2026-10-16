@@ -16,9 +16,9 @@ struct scratch_description {
   int level1;
 };
 
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size);
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size,
-                  const unsigned char* inner_functor_data,
+void copy_functor(const std::byte* functor_data, std::size_t functor_size);
+void copy_functor(const std::byte* functor_data, std::size_t functor_size,
+                  const std::byte* inner_functor_data,
                   std::size_t inner_functor_size);
 void register_scalar_policy(std::uint64_t N);
 void register_range_policy(const char* space, const char* schedule,
@@ -171,15 +171,15 @@ template <class Functor>
 Functor replay_functor(Functor&& functor) {
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
   if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::copy_functor(reinterpret_cast<const unsigned char*>(&functor),
+    impl::copy_functor(reinterpret_cast<const std::byte*>(&functor),
                        sizeof(functor),
-                       reinterpret_cast<const unsigned char*>(
+                       static_cast<const std::byte*>(
                            krepe::hdl_utils::hdl_host_lambda_pointer(functor)),
                        krepe::hdl_utils::hdl_host_lambda_size(functor));
   } else
 #endif
   {
-    impl::copy_functor(reinterpret_cast<const unsigned char*>(&functor),
+    impl::copy_functor(reinterpret_cast<const std::byte*>(&functor),
                        sizeof(Functor));
   }
   return functor;

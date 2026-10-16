@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <sstream>
@@ -39,7 +40,7 @@ inline void throw_error(CUresult error, const char* expr, const char* file,
 #define CHECK_CUDA_CALL(expr) \
   ::krepe::impl::throw_error((expr), #expr, __FILE__, __LINE__)
 
-inline auto regular_device_allocate(std::size_t size, char* data) {
+inline auto regular_device_allocate(std::size_t size, const std::byte* data) {
   void* ptr;
   KOKKOS_IMPL_CUDA_SAFE_CALL(cudaMalloc(&ptr, size));
   KOKKOS_IMPL_CUDA_SAFE_CALL(
@@ -48,7 +49,8 @@ inline auto regular_device_allocate(std::size_t size, char* data) {
       ptr, [](void* ptr) { KOKKOS_IMPL_CUDA_SAFE_CALL(cudaFree(ptr)); });
 }
 
-inline void device_copy_data(char* address, char* data, std::size_t size) {
+inline void device_copy_data(std::byte* address, const std::byte* data,
+                             std::size_t size) {
   KOKKOS_IMPL_CUDA_SAFE_CALL(
       cudaMemcpy(address, data, size, cudaMemcpyHostToDevice));
 }
