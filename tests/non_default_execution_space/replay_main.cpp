@@ -6,8 +6,8 @@
 #include <krepe/replayer.hpp>
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv);
 
   using exec_space   = Kokkos::DefaultHostExecutionSpace;
   using memory_space = typename exec_space::memory_space;

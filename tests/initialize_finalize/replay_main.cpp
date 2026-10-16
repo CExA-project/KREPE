@@ -8,8 +8,8 @@
 // FIXME: properly test that krepe cannot be used when not initialized or when
 // finalized
 int main(int argc, char* argv[]) {
-  krepe::initialize(argc, argv);
   Kokkos::initialize(argc, argv);
+  krepe::initialize(argc, argv);
   {
     const int N = 1024;
     Kokkos::View<int*> values;
@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
           }
         });
   }
-  Kokkos::finalize();
   krepe::finalize();
+  Kokkos::finalize();
   return 0;
 }
