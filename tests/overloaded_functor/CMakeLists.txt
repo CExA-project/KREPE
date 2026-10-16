@@ -7,4 +7,4 @@ target_link_libraries(overloaded_functor PRIVATE krepe_warnings krepe_sanitizers
 add_executable(overloaded_functor_replay replay_main.cpp)
 target_link_libraries(overloaded_functor_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(overloaded_functor FALSE)
+add_replay_test(overloaded_functor)
