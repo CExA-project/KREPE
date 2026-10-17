@@ -59,7 +59,7 @@ constexpr bool lambda_is_hdl() {
 }
 
 constexpr std::size_t align_offset(std::size_t offset, std::size_t alignment) {
-  return (offset + alignment - 1) / alignment * alignment;
+  return ((offset + alignment - 1) / alignment) * alignment;
 }
 
 template <class... Fields>
@@ -70,15 +70,15 @@ constexpr std::size_t host_capture_size() {
     std::size_t size      = 0;
     std::size_t alignment = 1;
 
-    const auto add_capture = [&](std::size_t capture_size,
-                                 std::size_t capture_alignment) {
-      size = align_offset(size, capture_alignment);
-      size += capture_size;
-      if (capture_alignment > alignment) {
-        alignment = capture_alignment;
+    const auto add_a_field = [&](std::size_t field_size,
+                                 std::size_t field_alignment) {
+      size = align_offset(size, field_alignment);
+      size += field_size;
+      if (field_alignment > alignment) {
+        alignment = field_alignment;
       }
     };
-    (add_capture(sizeof(Fields), alignof(Fields)), ...);
+    (add_a_field(sizeof(Fields), alignof(Fields)), ...);
 
     return align_offset(size, alignment);
   }
