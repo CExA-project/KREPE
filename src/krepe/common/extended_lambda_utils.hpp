@@ -126,8 +126,9 @@ template <template <bool, bool, bool, class, class, class...> class T,
 void visit_hdl_host_lambdas(
     const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag, Fun, Fields...>& f,
     Visitor& visitor) {
-  static_assert(!HasFuncPtrConv,
-                "NVCC lambdas without a host lambda buffer are not supported");
+  static_assert(
+      !HasFuncPtrConv,
+      "NVCC lambdas with an empty capture list ([]) are not supported");
   static_assert(host_capture_size<Fields...>() <= sizeof(f));
   // Access the member directly: over-aligned captures can add padding after
   // this pointer, so it is not necessarily at sizeof(f) - sizeof(void*).
