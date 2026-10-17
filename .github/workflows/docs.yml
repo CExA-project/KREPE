@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "zensical.toml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches: [main, docs/website]
+    paths:
+      - "docs/**"
+      - "zensical.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: read
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install Zensical
+        run: python -m pip install zensical==0.0.71
+
+      - name: Configure Pages
+        id: pages
+        if: >-
+          github.event_name != 'pull_request' &&
+          (github.ref == 'refs/heads/main' ||
+           (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
+        uses: actions/configure-pages@v6
+
+      - name: Build documentation
+        env:
+          DOCS_SITE_URL: ${{ steps.pages.outputs.base_url }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          source = Path("zensical.toml").read_text()
+          settings = {
+              "repo_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}",
+          }
+          if base_url := os.environ["DOCS_SITE_URL"]:
+              settings["site_url"] = base_url.rstrip("/") + "/"
+          for key, value in settings.items():
+              source, count = re.subn(
+                  rf"(?m)^{key}\s*=.*$",
+                  lambda _: f"{key} = {json.dumps(value)}",
+                  source,
+              )
+              if count != 1:
+                  raise RuntimeError(f"Expected one {key} setting")
+          Path("zensical.ci.toml").write_text(source)
+          PY
+          zensical build --clean --config-file zensical.ci.toml
+
+      - name: Upload documentation
+        if: >-
+          github.event_name != 'pull_request' &&
+          (github.ref == 'refs/heads/main' ||
+           (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
