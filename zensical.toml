@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+[project]
+site_name = "KREPE"
+site_description = "Kernel Replay Execution for Performance Evaluation"
+site_url = "https://cexa-project.github.io/KREPE/"
+repo_url = "https://github.com/CExA-project/KREPE"
+
+nav = [
+    "index.md",
+    { "Quickstart" = "quickstart.md" },
+    { "Installation" = "installation.md" },
+    { "Kernel capture" = "capture.md" },
+    { "Kernel replay" = "replay.md" },
+    { "Result validation" = "validation.md" },
+    { "Benchmarking & auto-tuning" = "benchmarking.md" },
+    { "C++ API" = "api.md" },
+    { "HDF5 dump format" = "hdf5-dumps.md" },
+]
