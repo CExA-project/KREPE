@@ -111,7 +111,10 @@ void init_extended_lambda_host_closure(void* buffer, std::size_t size,
         "B. Recapture the kernel with the current extractor.");
   }
   if (offset > total_size || size > total_size - offset) {
-    throw std::runtime_error("The NVCC host closure exceeds the stored data");
+    throw std::runtime_error(
+        "The NVCC host closure exceeds the stored data: offset=" +
+        std::to_string(offset) + "B, size=" + std::to_string(size) +
+        "B, total_size=" + std::to_string(total_size) + "B");
   }
   std::memcpy(buffer, nvcc_inner_lambda_data.data() + offset, size);
 }
