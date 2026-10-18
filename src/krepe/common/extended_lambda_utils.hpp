@@ -48,11 +48,11 @@
 
 namespace krepe::hdl_utils {
 
-template <class Functor>
-constexpr bool lambda_is_hdl() {
+template <class T>
+constexpr bool is_hdl() {
 #if defined(KOKKOS_COMPILER_NVCC)
   return __nv_is_extended_host_device_lambda_closure_type(
-      std::remove_cvref_t<Functor>);
+      std::remove_cvref_t<T>);
 #else
   return false;
 #endif
