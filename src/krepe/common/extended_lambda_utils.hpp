@@ -62,9 +62,9 @@ constexpr std::size_t align_offset(std::size_t offset, std::size_t alignment) {
   return ((offset + alignment - 1) / alignment) * alignment;
 }
 
-template <class... Fields>
+template <class... CapturedTypes>
 constexpr std::size_t host_capture_size() {
-  if constexpr (sizeof...(Fields) == 0) {
+  if constexpr (sizeof...(CapturedTypes) == 0) {
     return 1;
   } else {
     std::size_t size      = 0;
@@ -78,7 +78,7 @@ constexpr std::size_t host_capture_size() {
         alignment = field_alignment;
       }
     };
-    (add_a_field(sizeof(Fields), alignof(Fields)), ...);
+    (add_a_field(sizeof(CapturedTypes), alignof(CapturedTypes)), ...);
 
     return align_offset(size, alignment);
   }
@@ -98,47 +98,47 @@ void visit_hdl_host_lambdas(const T&, Visitor&) {
 // step.
 template <template <bool, bool, bool, class, class, class...> class T,
           bool IsMutable, bool HasFuncPtrConv, bool NeverThrows, class Tag,
-          class Fun, class... Fields, class Visitor>
-void visit_hdl_host_lambdas(
-    const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag, Fun, Fields...>& f,
-    Visitor& visitor);
+          class Fun, class... CapturedTypes, class Visitor>
+void visit_hdl_host_lambdas(const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag,
+                                    Fun, CapturedTypes...>& f,
+                            Visitor& visitor);
 
-template <class... Fields, class Visitor>
+template <class... CapturedTypes, class Visitor>
 void visit_hdl_captures(const void* storage, Visitor& visitor) {
-  if constexpr (sizeof...(Fields) > 0) {
+  if constexpr (sizeof...(CapturedTypes) > 0) {
     std::size_t offset     = 0;
     const auto* bytes      = static_cast<const std::byte*>(storage);
-    const auto visit_field = [&]<class Field>() {
-      offset = align_offset(offset, alignof(Field));
-      if constexpr (lambda_is_hdl<Field>()) {
-        visit_hdl_host_lambdas(*reinterpret_cast<const Field*>(bytes + offset),
-                               visitor);
+    const auto visit_field = [&]<class CapturedType>() {
+      offset = align_offset(offset, alignof(CapturedType));
+      if constexpr (lambda_is_hdl<CapturedType>()) {
+        visit_hdl_host_lambdas(
+            *reinterpret_cast<const CapturedType*>(bytes + offset), visitor);
       }
-      offset += sizeof(Field);
+      offset += sizeof(CapturedType);
     };
-    (visit_field.template operator()<Fields>(), ...);
+    (visit_field.template operator()<CapturedTypes>(), ...);
   }
 }
 
 template <template <bool, bool, bool, class, class, class...> class T,
           bool IsMutable, bool HasFuncPtrConv, bool NeverThrows, class Tag,
-          class Fun, class... Fields, class Visitor>
-void visit_hdl_host_lambdas(
-    const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag, Fun, Fields...>& f,
-    Visitor& visitor) {
+          class Fun, class... CapturedTypes, class Visitor>
+void visit_hdl_host_lambdas(const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag,
+                                    Fun, CapturedTypes...>& f,
+                            Visitor& visitor) {
   static_assert(
       !HasFuncPtrConv,
       "NVCC lambdas with an empty capture list ([]) are not supported");
-  static_assert(host_capture_size<Fields...>() <= sizeof(f));
+  static_assert(host_capture_size<CapturedTypes...>() <= sizeof(f));
   // Access the member directly: over-aligned captures can add padding after
   // this pointer, so it is not necessarily at sizeof(f) - sizeof(void*).
 
   // Visit the parent before its children: restoring its host buffer also
   // replaces the bytes of the wrappers captured inside that buffer.
   visitor(&f, const_cast<void**>(&f.data), f.data,
-          host_capture_size<Fields...>());
-  visit_hdl_captures<Fields...>(&f, visitor);
-  visit_hdl_captures<Fields...>(f.data, visitor);
+          host_capture_size<CapturedTypes...>());
+  visit_hdl_captures<CapturedTypes...>(&f, visitor);
+  visit_hdl_captures<CapturedTypes...>(f.data, visitor);
 }
 
 }  // namespace krepe::hdl_utils
