@@ -110,7 +110,7 @@ void visit_hdl_captures(const void* storage, Visitor& visitor) {
     const auto* bytes      = static_cast<const std::byte*>(storage);
     const auto visit_field = [&]<class CapturedType>() {
       offset = align_offset(offset, alignof(CapturedType));
-      if constexpr (lambda_is_hdl<CapturedType>()) {
+      if constexpr (is_hdl<CapturedType>()) {
         visit_hdl_host_lambdas(
             *reinterpret_cast<const CapturedType*>(bytes + offset), visitor);
       }

@@ -68,7 +68,7 @@ class FunctorRestore {
       : storage_(&functor), original_(sizeof(Functor)) {
     std::memcpy(original_.data(), storage_, original_.size());
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-    if constexpr (hdl_utils::lambda_is_hdl<Functor>()) {
+    if constexpr (hdl_utils::is_hdl<Functor>()) {
       auto save = [&](const void*, void** pointer_slot, void* buffer,
                       std::size_t size) {
         HostClosure closure{pointer_slot, buffer, std::vector<std::byte>(size)};

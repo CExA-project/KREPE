@@ -187,7 +187,7 @@ void register_bounds(const Kokkos::TeamPolicy<Args...>& policy) {
 template <class Functor>
 Functor replay_functor(Functor&& functor) {
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-  if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
+  if constexpr (krepe::hdl_utils::is_hdl<Functor>()) {
     impl::copy_nvcc_functor(functor);
   } else
 #endif
