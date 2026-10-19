@@ -1,84 +1,177 @@
-# HDF5 Dump Format
+# HDF5 file layout
 
-The `--krepe-dump-kernel-label=<label>` argument selects one Kokkos kernel label
-to dump. For example, `--krepe-dump-kernel-label=sum_values` matches a kernel
-launched with the label `"sum_values"`.
+<div class="hdf5-tree" markdown="1">
+<div class="hdf5-root"><code>/</code></div>
 
-For each matching kernel invocation, the tool writes one HDF5 file:
+<div class="hdf5-children" markdown="1">
 
-```text
-krepe_<kernel-label>_<kernel-id>.h5
-```
+<details markdown="1">
+<summary><span>Root attributes</span> <span>Kernel identity</span></summary>
 
-The `/in` group is written before the kernel runs, and the `/out` group is
-appended after it completes. Each group contains one snapshot of all active
-user-visible Kokkos allocations.
+<ul class="hdf5-fields">
+  <li><code>kernel_label</code> <span>Kokkos kernel label</span></li>
+  <li><code>kernel_id</code> <span>Tool-local ID counting all kernel launches, across labels</span></li>
+  <li><code>kernel_invocation</code> <span>Invocation number for this label, starting at 1</span></li>
+</ul>
 
-The root stores these attributes:
+</details>
 
-```text
-kernel_label       # Kokkos label of the matched kernel
-kernel_id          # tool-local id assigned to this kernel invocation
-kernel_invocation  # allow dumping a specific kernel invocation
-```
+<details markdown="1">
+<summary><code>in/</code> <span>Before the kernel</span></summary>
 
-The `/in` and `/out` groups each store these snapshot specific attributes:
+<ul class="hdf5-fields">
+  <li><code>active_allocations</code> <span>Number of allocations in this snapshot</span></li>
+  <li><code>active_bytes</code> <span>Sum of bounded user-data sizes, including skipped allocations, in bytes</span></li>
+</ul>
 
-```text
-active_allocations # tracked user allocations alive at dump time
-active_bytes       # total bounded user-data bytes for those active allocations
-```
+<div class="hdf5-children" markdown="1">
 
-The `/in/views` and `/out/views` groups contain one subgroup per active
-allocation. Each allocation group stores:
+<details markdown="1">
+<summary><code>views/</code> <span>Captured allocations</span></summary>
 
-```text
-label         # Kokkos allocation label
-space         # Kokkos memory space name reported by the profiling hook
-ptr           # allocation pointer value, stored as text
-p_data        # user data pointer after the Kokkos allocation header
-size          # bounded user-data bytes, 0 for empty or unbounded allocations
-reported_size # size reported by the Kokkos profiling allocation hook
-bytes_dumped  # 1 when the bytes dataset was written, 0 when it was skipped
-skip_reason   # present only when bytes_dumped is 0
-bytes         # byte dataset, present when bytes_dumped is 1
-```
+<div class="hdf5-children" markdown="1">
 
-The `/metadata` group contains user specified metadata
+<details markdown="1">
+<summary><code>view_&lt;index&gt;_&lt;label&gt;/</code> <span>One group per allocation</span></summary>
 
-The `/policy` group contains the type of policy that was saved as well as its
-compile-time and runtime attributes:
+<ul class="hdf5-fields">
+  <li><code>label</code> <span>Kokkos allocation label</span></li>
+  <li><code>space</code> <span>Memory space reported by the profiling hook</span></li>
+  <li><code>ptr</code> <span>Allocation pointer, stored as text</span></li>
+  <li><code>p_data</code> <span>User-data pointer after the allocation header, stored as text</span></li>
+  <li><code>size</code> <span>Bounded user-data size in bytes; 0 if empty or unbounded</span></li>
+  <li><code>reported_size</code> <span>Size reported by the allocation hook, in bytes</span></li>
+  <li><code>bytes_dumped</code> <span>1 if bytes is present, including an empty dataset; 0 if skipped</span></li>
+  <li><code>skip_reason</code> <span>Present only when bytes_dumped = 0; explains why data was skipped</span></li>
+  <li><code>bytes</code> <span>Unsigned-byte dataset; present only when bytes_dumped = 1</span></li>
+</ul>
 
-```
-type              # the type of policy stored, or "none" if no policy was recorded
-space             # the execution space's name (for every type except scalar)
-schedule          # the scheduling policy
-index_type_size   # size in bytes of the policy's index_type (for every type except scalar)
-index_type_signed # whether the policy's index_type is signed (for every type except scalar)
+</details>
 
-# type == "scalar"
-end # the end index
+</div>
 
-# type == "range"
-begin      # the starting index
-end        # the end index
-chunk_size # the chunk size parameter
+</details>
 
-# type == "mdrange"
-rank      # the policy's rank
-outer_dir # the policy's outer iteration direction
-inner_dir # the policy's inner iteration direction
-begin     # int64_t dataset storing the starting indices
-end       # int64_t dataset storing the end indices
-tile      # int64_t dataset storing the tile dimensions
+</div>
 
-# type == "team"
-team_size       # number of threads per team
-league_size     # number of teams
-vector_length   # number of vector lanes per team thread, or -1 if AUTO
-team_scratch_0   # amount of level 0 scratch memory per team, in bytes
-team_scratch_1   # amount of level 1 scratch memory per team, in bytes
-thread_scratch_0 # amount of level 0 scratch memory per thread, in bytes
-thread_scratch_1 # amount of level 1 scratch memory per thread, in bytes
-chunk_size      # the chunk size parameter
-```
+</details>
+
+<details markdown="1">
+<summary><code>out/</code> <span>After the kernel</span></summary>
+
+<ul class="hdf5-fields">
+  <li><code>active_allocations</code> <span>Number of allocations in this snapshot</span></li>
+  <li><code>active_bytes</code> <span>Sum of bounded user-data sizes, including skipped allocations, in bytes</span></li>
+</ul>
+
+<div class="hdf5-children" markdown="1">
+
+<details markdown="1">
+<summary><code>views/</code> <span>Captured allocations</span></summary>
+
+<div class="hdf5-children" markdown="1">
+
+<details markdown="1">
+<summary><code>view_&lt;index&gt;_&lt;label&gt;/</code> <span>One group per allocation</span></summary>
+
+<ul class="hdf5-fields">
+  <li><code>label</code> <span>Kokkos allocation label</span></li>
+  <li><code>space</code> <span>Memory space reported by the profiling hook</span></li>
+  <li><code>ptr</code> <span>Allocation pointer, stored as text</span></li>
+  <li><code>p_data</code> <span>User-data pointer after the allocation header, stored as text</span></li>
+  <li><code>size</code> <span>Bounded user-data size in bytes; 0 if empty or unbounded</span></li>
+  <li><code>reported_size</code> <span>Size reported by the allocation hook, in bytes</span></li>
+  <li><code>bytes_dumped</code> <span>1 if bytes is present, including an empty dataset; 0 if skipped</span></li>
+  <li><code>skip_reason</code> <span>Present only when bytes_dumped = 0; explains why data was skipped</span></li>
+  <li><code>bytes</code> <span>Unsigned-byte dataset; present only when bytes_dumped = 1</span></li>
+</ul>
+
+</details>
+
+</div>
+
+</details>
+
+</div>
+
+</details>
+
+<details markdown="1">
+<summary><code>policy/</code> <span>Execution policy</span></summary>
+
+Select the recorded policy type to see its fields
+
+=== "Range"
+
+    - `type` <span>"range"</span>
+    - `space` <span>Execution space name</span>
+    - `schedule` <span>Scheduling policy: static or dynamic</span>
+    - `index_type_size` <span>Index type size, in bytes</span>
+    - `index_type_signed` <span>Whether the index type is signed</span>
+    - `begin` <span>Start index</span>
+    - `end` <span>End index</span>
+    - `chunk_size` <span>Chunk size parameter</span>
+
+=== "MDRange"
+
+    - `type` <span>"mdrange"</span>
+    - `space` <span>Execution space name</span>
+    - `schedule` <span>Scheduling policy: static or dynamic</span>
+    - `index_type_size` <span>Index type size, in bytes</span>
+    - `index_type_signed` <span>Whether the index type is signed</span>
+    - `rank` <span>Number of dimensions</span>
+    - `outer_dir` <span>Outer iteration direction: left or right</span>
+    - `inner_dir` <span>Inner iteration direction: left or right</span>
+    - `begin` <span>int64_t dataset of start indices</span>
+    - `end` <span>int64_t dataset of end indices</span>
+    - `tile` <span>int64_t dataset of tile dimensions</span>
+
+=== "Team"
+
+    - `type` <span>"team"</span>
+    - `space` <span>Execution space name</span>
+    - `schedule` <span>Scheduling policy: static or dynamic</span>
+    - `index_type_size` <span>Index type size, in bytes</span>
+    - `index_type_signed` <span>Whether the index type is signed</span>
+    - `team_size` <span>Threads per team, or -1 for AUTO</span>
+    - `league_size` <span>Number of teams</span>
+    - `vector_length` <span>Vector lanes per team thread, or -1 for AUTO</span>
+    - `team_scratch_0` <span>Level 0 scratch bytes per team; -1 if unavailable</span>
+    - `team_scratch_1` <span>Level 1 scratch bytes per team; -1 if unavailable</span>
+    - `thread_scratch_0` <span>Level 0 scratch bytes per thread; -1 if unavailable</span>
+    - `thread_scratch_1` <span>Level 1 scratch bytes per thread; -1 if unavailable</span>
+    - `chunk_size` <span>Chunk size parameter</span>
+
+=== "Scalar"
+
+    - `type` <span>"scalar"</span>
+    - `end` <span>End index</span>
+
+=== "None"
+
+    - `type` <span>"none" — no policy was recorded</span>
+
+</details>
+
+<details markdown="1">
+<summary><code>metadata/</code> <span>User metadata</span></summary>
+
+<ul class="hdf5-fields">
+  <li><code>&lt;key&gt;</code> <span>One string attribute per user key/value pair</span></li>
+</ul>
+
+</details>
+
+<details markdown="1">
+<summary><code>functor/</code> <span>Callable data for replay</span></summary>
+
+<ul class="hdf5-fields">
+  <li><code>functor</code> <span>Unsigned-byte dataset of the captured functor or lambda object</span></li>
+  <li><code>nvcc_inner_lambda</code> <span>Unsigned-byte dataset of the NVCC inner lambda</span></li>
+</ul>
+
+</details>
+
+</div>
+
+</div>

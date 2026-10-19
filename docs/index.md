@@ -18,7 +18,7 @@ Follow the [Quickstart](quickstart.md) to capture and replay your first kernel.
 - [Result validation](validation.md)
 - [Benchmarking & auto-tuning](benchmarking.md)
 - [C++ API](api.md)
-- [HDF5 dump format](hdf5-dumps.md)
+- [HDF5 file layout](hdf5-dumps.md)
 
 ## Source code
 

@@ -1,0 +1,135 @@
+/* SPDX-License-Identifier: MIT
+ * SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+ */
+
+.md-typeset .hdf5-tree {
+  padding: 0.8rem;
+  margin: 1rem 0;
+  border: 1px solid var(--md-default-fg-color--lightest);
+  border-radius: 0.3rem;
+}
+
+.md-typeset .hdf5-tree .hdf5-root {
+  margin-bottom: 0.25rem;
+  font-weight: 700;
+}
+
+.md-typeset .hdf5-tree .hdf5-children,
+.md-typeset .hdf5-tree ul {
+  padding: 0 0 0 0.8rem;
+  margin: 0 0 0 0.35rem;
+  list-style: none;
+  border-left: 1px solid var(--md-default-fg-color--lightest);
+}
+
+/* Reset the theme's admonition styling for tree branches only. */
+.md-typeset .hdf5-tree details {
+  position: relative;
+  padding: 0;
+  margin: 0;
+  overflow: visible;
+  font-size: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.md-typeset .hdf5-tree summary {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  align-items: baseline;
+  padding: 0.4rem 0.25rem 0.4rem 1rem;
+  margin: 0;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: 0;
+  border-radius: 0.2rem;
+}
+
+.md-typeset .hdf5-tree summary::before {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.15rem;
+  width: 0;
+  height: 0;
+  content: "";
+  background: none;
+  border: 0.18rem solid transparent;
+  border-right: 0;
+  border-left: 0.28rem solid currentColor;
+  -webkit-mask: none;
+  mask: none;
+  transform: none;
+}
+
+.md-typeset .hdf5-tree details[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.md-typeset .hdf5-tree summary::after,
+.md-typeset .hdf5-tree summary::-webkit-details-marker {
+  display: none;
+}
+
+.md-typeset .hdf5-tree summary:hover {
+  background: var(--md-default-fg-color--lightest);
+}
+
+.md-typeset .hdf5-tree summary:focus-visible {
+  outline: 2px solid var(--md-accent-fg-color);
+  outline-offset: 2px;
+}
+
+.md-typeset .hdf5-tree summary > span:last-child,
+.md-typeset .hdf5-tree ul span {
+  font-weight: 400;
+  color: var(--md-default-fg-color--light);
+}
+
+.md-typeset .hdf5-tree ul > li {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15rem 0.6rem;
+  align-items: baseline;
+  padding: 0.35rem 0;
+  margin: 0;
+}
+
+.md-typeset .hdf5-tree ul > li > span {
+  flex: 1 1 12rem;
+}
+
+.md-typeset .hdf5-tree .hdf5-children > details::before,
+.md-typeset .hdf5-tree ul > li::before {
+  position: absolute;
+  top: 1rem;
+  left: -0.8rem;
+  width: 0.6rem;
+  content: "";
+  border-top: 1px solid var(--md-default-fg-color--lightest);
+}
+
+.md-typeset .hdf5-tree code {
+  overflow-wrap: anywhere;
+}
+
+.md-typeset .hdf5-tree .tabbed-set {
+  margin: 0.5rem 0;
+}
+
+@media (max-width: 600px) {
+  .md-typeset .hdf5-tree {
+    padding: 0.5rem;
+  }
+
+  .md-typeset .hdf5-tree .hdf5-children,
+  .md-typeset .hdf5-tree ul {
+    margin-left: 0;
+  }
+}

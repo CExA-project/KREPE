@@ -85,7 +85,7 @@ KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale
 ```
 
 This generates one HDF5 file named `krepe_scale_2.h5`. See the
-[HDF5 dump format](docs/hdf5-dumps.md) for the file naming scheme and stored
+[HDF5 file layout](docs/hdf5-dumps.md) for the file structure and stored
 metadata.
 
 ### Parallel_for wrapper
