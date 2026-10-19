@@ -1015,7 +1015,7 @@ void finalize() {
 }
 
 void reset_inputs() {
-  if (!impl::krepe_is_initialized) {
+  if (impl::scope_guard == nullptr) {
     throw std::runtime_error("krepe::reset_inputs(): krepe is not initialized");
   }
 

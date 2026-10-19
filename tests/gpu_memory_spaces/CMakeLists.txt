@@ -7,4 +7,4 @@ target_link_libraries(gpu_memory_spaces PRIVATE krepe_warnings krepe_sanitizers 
 add_executable(gpu_memory_spaces_replay replay_main.cpp)
 target_link_libraries(gpu_memory_spaces_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(gpu_memory_spaces)
+add_replay_test(gpu_memory_spaces REPLAY_FLAGS --kernel-replayer-enable-input-reset)
