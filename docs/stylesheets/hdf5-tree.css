@@ -51,7 +51,7 @@
   border-radius: 0.2rem;
 }
 
-.md-typeset .hdf5-tree summary > .hdf5-attribute-label {
+.md-typeset .hdf5-tree summary > span:first-child {
   font-weight: 400;
 }
 

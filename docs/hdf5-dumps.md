@@ -6,7 +6,7 @@
 <div class="hdf5-children" markdown="1">
 
 <details markdown="1">
-<summary><code class="hdf5-attribute-label">Root attributes</code> <span>Kernel identity</span></summary>
+<summary><span>Root attributes</span> <span>Kernel identity</span></summary>
 
 <ul class="hdf5-fields">
   <li><code>kernel_label</code> <span>Kokkos kernel label</span></li>
