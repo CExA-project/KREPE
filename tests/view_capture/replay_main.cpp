@@ -11,7 +11,7 @@ int main(int argc, char* argv[]) {
 
   bool rejected = false;
   try {
-    replay_scope.reset_inputs();
+    krepe::reset_inputs();
   } catch (const std::runtime_error&) {
     rejected = true;
   }

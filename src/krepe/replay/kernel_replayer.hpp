@@ -424,7 +424,6 @@ class ScopeGuard {
     std::vector<std::byte> data;
   };
 
-  bool enable_input_reset_;
   std::vector<InputSnapshot> input_snapshots_;
   impl::ReplayAllocations replay_allocations_;
   std::vector<impl::Allocation> host_raw_allocations;
@@ -439,17 +438,25 @@ class ScopeGuard {
                        const impl::SnapshotAllocation& snapshot,
                        const std::byte* data);
 
+  void reset_inputs();
+
  public:
   // Enabling input reset keeps a host copy of all input allocation bytes.
-  ScopeGuard(int& argc, char* argv[], bool enable_input_reset = false);
+  ScopeGuard(int& argc, char* argv[]);
   ScopeGuard(const ScopeGuard&)            = delete;
   ScopeGuard& operator=(const ScopeGuard&) = delete;
   ~ScopeGuard();
 
-  // Restore inputs at their original addresses without reloading the dump.
-  // Requires input reset to be enabled and Kokkos to be initialized.
-  void reset_inputs();
+  friend void reset_inputs();
 };
+
+void initialize(int& argc, char* argv[]);
+
+void finalize();
+
+// Restore inputs at their original addresses without reloading the dump.
+// Requires input reset to be enabled and Kokkos to be initialized.
+void reset_inputs();
 
 std::optional<std::string> get_metadata(const std::string& key);
 
