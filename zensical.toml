@@ -18,4 +18,5 @@ nav = [
     { "Benchmarking & auto-tuning" = "benchmarking.md" },
     { "C++ API" = "api.md" },
     { "HDF5 file layout" = "hdf5-dumps.md" },
+    { "Citing KREPE" = "citation.md" },
 ]
