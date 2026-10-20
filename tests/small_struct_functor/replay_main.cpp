@@ -19,8 +19,8 @@ struct Functor {
 };
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv);
 
   int x = 0;
   int y = 0;
