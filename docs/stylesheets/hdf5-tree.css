@@ -51,6 +51,10 @@
   border-radius: 0.2rem;
 }
 
+.md-typeset .hdf5-tree summary > span:first-child {
+  font-weight: 400;
+}
+
 .md-typeset .hdf5-tree summary::before {
   position: absolute;
   top: 0.85rem;
