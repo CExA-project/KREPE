@@ -79,8 +79,7 @@ executed with the following environment variables in order to extract the first
 invocation of the kernel named "scale"
 ```sh
 KOKKOS_TOOLS_LIBS=/path/to/libkrepe.so \
-KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale
---krepe-dump-kernel-invocation=1" \
+KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale --krepe-dump-kernel-invocation=1" \
 ./prog
 ```
 
