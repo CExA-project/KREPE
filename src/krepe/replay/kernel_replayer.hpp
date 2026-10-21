@@ -83,7 +83,7 @@ class FunctorRestore {
   FunctorRestore(const FunctorRestore&)            = delete;
   FunctorRestore& operator=(const FunctorRestore&) = delete;
 
-  void init() {
+  void execute() {
     init_functor(static_cast<std::byte*>(storage_), original_.size());
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
     std::size_t total_size = 0;
@@ -642,27 +642,28 @@ decltype(auto) compare_views(const ReplayAllocation& allocation, Functor&& f) {
 template <class Functor>
 Functor replay_functor(const Functor& functor) {
   // In order to revive the to-be-replayed functor, we:
-  // - Create a temporary functor and copy construct it from an existing
-  //   functor (we have to use the copy constructor since its the only valid
+  // - Create a temporary functor and copy construct it from the parameter
+  //   functor (we have to use the copy constructor since it's the only valid
   //   method to construct a lambda)
   // - Save the binary representation of this temporary functor
-  // - memcpy the target functor into the temporary functor's memory
-  // - Copy construct a new functor f from the patched temporary functor, since
-  //   tracking is disabled, if the target functor contained Views, we won't get
-  //   a segfault once they are destroyed
+  // - memcpy the captured data from the kernel dump into the temporary functor
+  // - Copy construct functor_to_be_returned from the patched temporary functor.
+  //   With tracking disabled, copied Views do not dereference allocation
+  //   records from the capture process, including in their destructors.
   // - memcpy the old data of the temporary functor back and properly destroy it
-  // - return f
+  // - return functor_to_be_returned
   std::optional<Kokkos::Impl::SharedAllocationDisableTrackingGuard> tracking;
   if (Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_enabled()) {
     tracking.emplace();
   }
-  Functor dummy_functor(functor);
-  impl::FunctorRestore restore(dummy_functor);
-  restore.init();
-  // The return value is constructed before restore and dummy_functor are
-  // destroyed, including when NVCC recursively copies captured host closures.
-  Functor f(dummy_functor);
-  return f;
+  Functor functor_working_copy(functor);
+  impl::FunctorRestore restore(functor_working_copy);
+  restore.execute();
+  // The return value is constructed before restore's destructor runs and
+  // functor_working_copy is destroyed. NVCC also copies the host closures of
+  // captured extended lambdas, which must still contain the dump's data.
+  Functor functor_to_be_returned(functor_working_copy);
+  return functor_to_be_returned;
 }
 
 /**
