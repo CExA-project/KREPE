@@ -1,5 +1,8 @@
 # Benchmarking & auto-tuning
 
+We plan to add a function to measure kernel execution times. Later, we also
+plan to simplify integration with [APEX](https://github.com/UO-OACISS/apex).
+
 ## Repeating a replay with the same inputs
 
 Enable input reset with the `--kernel-replayer-enable-input-reset` flag:
