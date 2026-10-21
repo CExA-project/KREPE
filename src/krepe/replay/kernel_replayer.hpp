@@ -41,13 +41,75 @@ struct ReplayAllocation {
 namespace impl {
 
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-void* copy_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                        std::size_t inner_lambda_size);
-void restore_extended_lambda_inner_lambda(void* inner_lambda_ptr,
-                                          void* inner_lambda_save);
+void init_extended_lambda_host_closure(void* buffer, std::size_t size,
+                                       std::size_t offset,
+                                       std::size_t total_size);
 #endif
 
 void init_functor(std::byte* buffer, std::size_t size);
+
+// Keep every temporary host closure alive at its original address while its
+// captures are patched, then restore its bytes before the functor is destroyed.
+class FunctorRestore {
+  void* storage_;
+  std::vector<std::byte> original_;
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+  struct HostClosure {
+    void** pointer_slot;
+    void* buffer;
+    std::vector<std::byte> original;
+  };
+  std::vector<HostClosure> host_closures_;
+#endif
+
+ public:
+  template <class Functor>
+  explicit FunctorRestore(Functor& functor)
+      : storage_(&functor), original_(sizeof(Functor)) {
+    std::memcpy(original_.data(), storage_, original_.size());
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    if constexpr (hdl_utils::is_hdl<Functor>()) {
+      auto save = [&](const void*, void** pointer_slot, void* buffer,
+                      std::size_t size) {
+        HostClosure closure{pointer_slot, buffer, std::vector<std::byte>(size)};
+        std::memcpy(closure.original.data(), buffer, size);
+        host_closures_.push_back(std::move(closure));
+      };
+      hdl_utils::visit_hdl_host_lambdas(functor, save);
+    }
+#endif
+  }
+
+  FunctorRestore(const FunctorRestore&)            = delete;
+  FunctorRestore& operator=(const FunctorRestore&) = delete;
+
+  void execute() {
+    init_functor(static_cast<std::byte*>(storage_), original_.size());
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    std::size_t total_size = 0;
+    for (const auto& closure : host_closures_) {
+      total_size += closure.original.size();
+    }
+    std::size_t offset = 0;
+    for (auto& closure : host_closures_) {
+      std::memcpy(closure.pointer_slot, &closure.buffer, sizeof(void*));
+      init_extended_lambda_host_closure(closure.buffer, closure.original.size(),
+                                        offset, total_size);
+      offset += closure.original.size();
+    }
+#endif
+  }
+
+  ~FunctorRestore() {
+#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
+    for (auto it = host_closures_.rbegin(); it != host_closures_.rend(); ++it) {
+      std::memcpy(it->buffer, it->original.data(), it->original.size());
+    }
+#endif
+    std::memcpy(storage_, original_.data(), original_.size());
+  }
+};
+
 void* get_allocation(impl::MemorySpaceType memory_space,
                      const std::string& label);
 void* get_out_allocation(impl::MemorySpaceType memory_space,
@@ -586,58 +648,29 @@ decltype(auto) compare_views(const ReplayAllocation& allocation, Functor&& f) {
 
 template <class Functor>
 Functor replay_functor(const Functor& functor) {
-  constexpr int N = sizeof(Functor);
-
   // In order to revive the to-be-replayed functor, we:
-  // - Create a temporary functor and copy construct it from an existing
-  //   functor (we have to use the copy constructor since its the only valid
+  // - Create a temporary functor and copy construct it from the parameter
+  //   functor (we have to use the copy constructor since it's the only valid
   //   method to construct a lambda)
   // - Save the binary representation of this temporary functor
-  // - memcpy the target functor into the temporary functor's memory
-  // - Copy construct a new functor f from the patched temporary functor, since
-  //   tracking is disabled, if the target functor contained Views, we won't get
-  //   a segfault once they are destroyed
+  // - memcpy the captured data from the kernel dump into the temporary functor
+  // - Copy construct functor_to_be_returned from the patched temporary functor.
+  //   With tracking disabled, copied Views do not dereference allocation
+  //   records from the capture process, including in their destructors.
   // - memcpy the old data of the temporary functor back and properly destroy it
-  // - return f
-  Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_disable();
-
-  void* dummy_functor_storage = std::aligned_alloc(alignof(Functor), N);
-  Functor* dummy_functor      = new (dummy_functor_storage) Functor(functor);
-  void* dummy_functor_buffer_save = std::malloc(N);
-  std::memcpy(dummy_functor_buffer_save, dummy_functor_storage, N);
-
-#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-  [[maybe_unused]] void* inner_lambda_ptr  = nullptr;
-  [[maybe_unused]] void* inner_lambda_save = nullptr;
-  if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::init_functor(static_cast<std::byte*>(dummy_functor_storage),
-                       N - sizeof(void*));
-    inner_lambda_ptr =
-        krepe::hdl_utils::hdl_host_lambda_pointer(*dummy_functor);
-    inner_lambda_save = impl::copy_extended_lambda_inner_lambda(
-        inner_lambda_ptr,
-        krepe::hdl_utils::hdl_host_lambda_size(*dummy_functor));
-  } else
-#endif
-  {
-    impl::init_functor(static_cast<std::byte*>(dummy_functor_storage), N);
+  // - return functor_to_be_returned
+  std::optional<Kokkos::Impl::SharedAllocationDisableTrackingGuard> tracking;
+  if (Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_enabled()) {
+    tracking.emplace();
   }
-  Functor f(*dummy_functor);
-
-  std::memcpy(dummy_functor_storage, dummy_functor_buffer_save, N);
-  std::free(dummy_functor_buffer_save);
-#if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-  if constexpr (krepe::hdl_utils::lambda_is_hdl<Functor>()) {
-    impl::restore_extended_lambda_inner_lambda(inner_lambda_ptr,
-                                               inner_lambda_save);
-  }
-#endif
-  dummy_functor->~Functor();
-  std::free(dummy_functor_storage);
-
-  Kokkos::Impl::SharedAllocationRecord<void, void>::tracking_enable();
-
-  return f;
+  Functor functor_working_copy(functor);
+  impl::FunctorRestore restore(functor_working_copy);
+  restore.execute();
+  // The return value is constructed before restore's destructor runs and
+  // functor_working_copy is destroyed. NVCC also copies the host closures of
+  // captured extended lambdas, which must still contain the dump's data.
+  Functor functor_to_be_returned(functor_working_copy);
+  return functor_to_be_returned;
 }
 
 /**
