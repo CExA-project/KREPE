@@ -12,7 +12,7 @@
 
 ### `krepe::ScopeGuard`
 
-### `krepe::ScopeGuard::reset_inputs`
+### `krepe::reset_inputs`
 
 ## Allocations
 
