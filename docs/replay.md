@@ -73,6 +73,13 @@ krepe::parallel_for(
 Kokkos::fence();
 ```
 
+## Limitations
+
+The `LaunchBounds` and `WorkTag` template arguments cannot be restored
+automatically. Restoring `TeamPolicy` scratch parameters depends on the Kokkos
+version. See the [limitations](https://github.com/CExA-project/KREPE/blob/main/README.md#limitations)
+for generic-lambda restrictions and other constraints.
+
 ## Parallel_for wrapper
 
 For a kernel captured through another library's wrapper, use

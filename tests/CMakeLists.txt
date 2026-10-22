@@ -9,18 +9,22 @@ set(TEST_LAUNCHER "${CMAKE_CURRENT_LIST_DIR}/launcher.sh")
 # the same replay tests inside a single Slurm allocation.
 add_custom_target(krepe_run_replay_tests)
 
-function(add_replay_test TEST_NAME COMPARE_OUTPUT)
+function(add_replay_test TEST_NAME)
+  cmake_parse_arguments(PARSE_ARGV 1 arg "COMPARE_OUTPUT" "" "TOOL_FLAGS;REPLAY_FLAGS")
   set(TEST_WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/work/${TEST_NAME}")
   file(MAKE_DIRECTORY "${TEST_WORKING_DIRECTORY}")
 
-  if(COMPARE_OUTPUT)
-    set(COMPARE_OUTPUT TRUE)
-  else()
-    set(COMPARE_OUTPUT FALSE)
+  if(NOT arg_TOOL_FLAGS)
+    set(arg_TOOL_FLAGS "\"\"")
   endif()
 
-  set(TEST_COMMAND "${TEST_LAUNCHER}" "$<TARGET_FILE:krepe_kokkos_hooks>" "$<TARGET_FILE:${TEST_NAME}>"
-                   "$<TARGET_FILE:${TEST_NAME}_replay>" "${COMPARE_OUTPUT}" ${ARGN}
+  if(NOT arg_REPLAY_FLAGS)
+    set(arg_REPLAY_FLAGS "\"\"")
+  endif()
+
+  set(TEST_COMMAND
+      "${TEST_LAUNCHER}" "$<TARGET_FILE:krepe_kokkos_hooks>" "$<TARGET_FILE:${TEST_NAME}>"
+      "$<TARGET_FILE:${TEST_NAME}_replay>" "${arg_COMPARE_OUTPUT}" "${arg_TOOL_FLAGS}" "${arg_REPLAY_FLAGS}"
   )
 
   add_test(NAME "${TEST_NAME}" COMMAND ${TEST_COMMAND} WORKING_DIRECTORY "${TEST_WORKING_DIRECTORY}")
@@ -60,6 +64,7 @@ add_subdirectory(team_policy)
 add_subdirectory(non_default_execution_space)
 add_subdirectory(index_type)
 add_subdirectory(empty_view)
+add_subdirectory(initialize_finalize)
 
 if(Kokkos_ENABLE_CUDA OR Kokkos_ENABLE_HIP)
   add_subdirectory(gpu_memory_spaces)

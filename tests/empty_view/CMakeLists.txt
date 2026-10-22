@@ -9,7 +9,7 @@ target_link_libraries(
   empty_view_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized
 )
 
-add_replay_test(empty_view FALSE)
+add_replay_test(empty_view)
 
 add_executable(empty_view_without_extent without_extent_main.cpp)
 target_link_libraries(empty_view_without_extent PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_extractor)
@@ -19,4 +19,4 @@ target_link_libraries(
   empty_view_without_extent_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized
 )
 
-add_replay_test(empty_view_without_extent FALSE)
+add_replay_test(empty_view_without_extent)

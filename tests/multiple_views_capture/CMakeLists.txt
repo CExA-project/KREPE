@@ -7,4 +7,4 @@ target_link_libraries(multiple_views_capture PRIVATE krepe_warnings krepe_saniti
 add_executable(multiple_views_capture_replay replay_main.cpp)
 target_link_libraries(multiple_views_capture_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(multiple_views_capture FALSE)
+add_replay_test(multiple_views_capture)

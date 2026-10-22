@@ -105,11 +105,13 @@ directory and reports its path.
 
 ## Replay the kernel
 
-Pass the generated dump to the replay program:
+Pass the generated dump to the replay program. Replace
+`krepe_scale_<kernel_id>.h5` with the dump path reported during capture:
 
 ```sh
 # Load the captured data and execution policy from the dump.
-./build/replay_prog --kernel-replayer-dump krepe_scale_*.h5
+./build/replay_prog \
+  --kernel-replayer-dump="krepe_scale_<kernel_id>.h5"
 ```
 
 <details markdown="1">

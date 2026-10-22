@@ -8,9 +8,11 @@ plan to simplify integration with [APEX](https://github.com/UO-OACISS/apex).
 Enable input reset with the `--kernel-replayer-enable-input-reset` flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump=krepe_scale_2.h5 \
+./replay_prog --kernel-replayer-dump="krepe_scale_<kernel_id>.h5" \
   --kernel-replayer-enable-input-reset
 ```
+
+Replace `krepe_scale_<kernel_id>.h5` with the dump path reported during capture.
 
 Call `krepe::reset_inputs()` before each replay to restore the captured inputs.
 

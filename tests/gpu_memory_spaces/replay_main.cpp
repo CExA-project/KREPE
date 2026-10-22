@@ -106,7 +106,7 @@ void compare_values(const krepe::ReplayAllocation& allocation) {
 }  // namespace
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv, true);
+  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
   Kokkos::View<int*, DeviceSpace> device_values;
@@ -114,7 +114,7 @@ int main(int argc, char* argv[]) {
   Kokkos::View<int*, HostPinnedSpace> host_pinned_values;
 
   for (int repetition = 0; repetition < 3; ++repetition) {
-    replay_scope.reset_inputs();
+    krepe::reset_inputs();
     krepe::parallel_for(
         "test_kernel", 0, KOKKOS_LAMBDA(const int i) {
           device_values(i) *= 2;

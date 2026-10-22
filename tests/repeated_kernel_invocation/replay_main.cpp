@@ -13,14 +13,14 @@ struct MultiplyFunctor {
 };
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv, true);
+  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
   const int N = 1024;
   Kokkos::View<int*> values;
 
   for (int repetition = 0; repetition < 3; ++repetition) {
-    replay_scope.reset_inputs();
+    krepe::reset_inputs();
     krepe::parallel_for("test_kernel", N, MultiplyFunctor{0, values});
     Kokkos::fence();
 

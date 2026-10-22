@@ -1,5 +1,9 @@
 # HDF5 file layout
 
+In allocation group names `view_<index>_<label>`, characters other than letters,
+digits, `_`, `-` and `.` are replaced with `_`, and the label is truncated to
+80 characters. The `label` attribute retains the original allocation label.
+
 <div class="hdf5-tree" markdown="1">
 <div class="hdf5-root"><code>/</code></div>
 
