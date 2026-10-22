@@ -12,7 +12,7 @@ Enable input reset with the `--kernel-replayer-enable-input-reset` flag:
   --kernel-replayer-enable-input-reset
 ```
 
-Call `krepe::reset_inputs()` before each replay to restore the captured inputs:
+Call `krepe::reset_inputs()` before each replay to restore the captured inputs.
 
 ```cpp
 #include <Kokkos_Core.hpp>
@@ -23,13 +23,12 @@ int main(int argc, char* argv[]) {
   krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
-  const int N = 1024;
   Kokkos::View<int*> values;
 
   for (int repetition = 0; repetition < 10; ++repetition) {
     krepe::reset_inputs();
     krepe::parallel_for(
-        "scale", N, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
+        "scale", 0, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
     Kokkos::fence();
   }
 
