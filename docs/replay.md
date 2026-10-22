@@ -87,3 +87,33 @@ my_funky_parallel_for("kernel", 1024,
 As in [Kernel capture](capture.md#parallel_for-wrapper),
 `my_funky_parallel_for` represents your library's wrapper. The execution
 policy is not saved in this case, so it must be supplied to the wrapper.
+
+## Accessing the allocations
+
+The local `values` View stays empty during replay. Use the captured allocation's
+label with `krepe::get_allocation` to access the active buffer. It initially
+contains the captured inputs, then the replayed kernel modifies it.
+`krepe::get_out_allocation` returns the reference output recorded during capture.
+
+After the replay and its fence, wrap these pointers in unmanaged Views:
+
+```cpp
+using memory_space = Kokkos::DefaultExecutionSpace::memory_space;
+using AllocationView =
+    Kokkos::View<int*, memory_space, Kokkos::MemoryTraits<Kokkos::Unmanaged>>;
+
+auto* data = static_cast<int*>(krepe::get_allocation<memory_space>("values"));
+auto* reference_data =
+    static_cast<int*>(krepe::get_out_allocation<memory_space>("values"));
+
+AllocationView replayed_values(data, 1024);
+AllocationView reference_values(reference_data, 1024);
+```
+
+This snippet assumes that both the input allocation and its reference output
+are present. Check the pointers for `nullptr` before constructing the Views
+when either may be missing. KREPE owns these buffers: do not free the pointers
+or keep these Views beyond the lifetime of `replay_scope`.
+
+For result checking, see the optional `krepe::compare_views` example in the
+[Quickstart](quickstart.md#replay-the-kernel).
