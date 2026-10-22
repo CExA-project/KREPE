@@ -10,7 +10,10 @@ on:
       - "zensical.toml"
       - ".github/workflows/docs.yml"
   push:
-    branches: [main, docs/website]
+    branches:
+      - main
+      # TODO: Remove this fork preview branch before merging upstream.
+      - docs/website
     paths:
       - "docs/**"
       - "zensical.toml"
@@ -23,9 +26,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: read
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
 
@@ -33,20 +34,13 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install Zensical
-        run: python -m pip install zensical==0.0.71
+      - name: Install documentation dependencies
+        run: python -m pip install -r docs/requirements.txt
 
-      - name: Configure Pages
-        id: pages
-        if: >-
-          github.event_name != 'pull_request' &&
-          (github.ref == 'refs/heads/main' ||
-           (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
-        uses: actions/configure-pages@v6
-
-      - name: Build documentation
-        env:
-          DOCS_SITE_URL: ${{ steps.pages.outputs.base_url }}
+      # TODO: Remove this fork preview step before merging upstream.
+      - name: Configure fork preview
+        id: preview
+        if: github.event.repository.fork && github.ref == 'refs/heads/docs/website'
         run: |
           python - <<'PY'
           import json
@@ -54,12 +48,14 @@ jobs:
           import re
           from pathlib import Path
 
-          source = Path("zensical.toml").read_text()
+          repository = os.environ["GITHUB_REPOSITORY"]
+          owner = os.environ["GITHUB_REPOSITORY_OWNER"]
+          name = repository.split("/", 1)[1]
           settings = {
-              "repo_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}",
+              "site_url": f"https://{owner}.github.io/{name}/",
+              "repo_url": f"{os.environ['GITHUB_SERVER_URL']}/{repository}",
           }
-          if base_url := os.environ["DOCS_SITE_URL"]:
-              settings["site_url"] = base_url.rstrip("/") + "/"
+          source = Path("zensical.toml").read_text()
           for key, value in settings.items():
               source, count = re.subn(
                   rf"(?m)^{key}\s*=.*$",
@@ -68,26 +64,31 @@ jobs:
               )
               if count != 1:
                   raise RuntimeError(f"Expected one {key} setting")
-          Path("zensical.ci.toml").write_text(source)
+          Path("zensical.preview.toml").write_text(source)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("config_file=zensical.preview.toml\n")
           PY
-          zensical build --clean --config-file zensical.ci.toml
+
+      - name: Build documentation
+        # TODO: Remove env and --config-file before merging upstream.
+        env:
+          DOCS_CONFIG_FILE: ${{ steps.preview.outputs.config_file }}
+        run: zensical build --clean --strict --config-file "${DOCS_CONFIG_FILE:-zensical.toml}"
 
       - name: Upload documentation
-        if: >-
-          github.event_name != 'pull_request' &&
-          (github.ref == 'refs/heads/main' ||
-           (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
         uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
   deploy:
     needs: build
+    # TODO: Remove the fork/docs/website clause before merging upstream.
     if: >-
       github.event_name != 'pull_request' &&
       (github.ref == 'refs/heads/main' ||
        (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       pages: write
       id-token: write
@@ -101,6 +102,9 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
+      - name: Configure Pages
+        uses: actions/configure-pages@v6
+
       - name: Deploy GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5

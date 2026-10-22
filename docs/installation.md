@@ -35,6 +35,9 @@ cmake --build build --parallel
 cmake --install build
 ```
 
+`CMAKE_INSTALL_LIBDIR=lib` keeps the tool in `lib/libkrepe.so`, matching the
+[Quickstart](quickstart.md).
+
 If CMake cannot find your HDF5 installation, add
 `-DHDF5_ROOT=/path/to/hdf5` to the configure command above.
 
@@ -46,7 +49,11 @@ To adjust the KREPE build, add `-DOPTION=VALUE` to its configure command:
 | --- | --- | --- |
 | `KREPE_BUILD_EXAMPLES` | `ON` | Build the capture and replay examples. |
 | `KREPE_BUILD_TESTS` | `OFF` | Build tests. |
+| `KREPE_ENABLE_WARNINGS` | `ON` | Enable compiler warnings. |
+| `KREPE_ENABLE_ASAN` | `OFF` | Enable AddressSanitizer instrumentation. |
+| `KREPE_ENABLE_UBSAN` | `OFF` | Enable UndefinedBehaviorSanitizer instrumentation. |
 | `KREPE_ENABLE_COMPILER_PLUGINS` | `ON` | Enable a compiler plugin when supported. |
+| `KREPE_GCC_PLUGIN_HEADERS_DIR` | Not set | Path to GCC plugin headers when they cannot be found automatically. |
 
 ### Compiler plugins
 

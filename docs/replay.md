@@ -54,11 +54,10 @@ The local `values` variable stays empty.
 Pass the dump using the `--kernel-replayer-dump` command-line flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump=krepe_scale_2.h5
+./replay_prog --kernel-replayer-dump="krepe_scale_<kernel_id>.h5"
 ```
 
-Replace `krepe_scale_2.h5` with the path to the HDF5 file generated during
-capture.
+Replace `krepe_scale_<kernel_id>.h5` with the dump path reported during capture.
 
 ## Modifying the execution policy
 
@@ -72,13 +71,6 @@ krepe::parallel_for(
     KOKKOS_LAMBDA(int i) { values(i) *= 2; });
 Kokkos::fence();
 ```
-
-## Limitations
-
-The `LaunchBounds` and `WorkTag` template arguments cannot be restored
-automatically. Restoring `TeamPolicy` scratch parameters depends on the Kokkos
-version. See the [limitations](https://github.com/CExA-project/KREPE/blob/main/README.md#limitations)
-for generic-lambda restrictions and other constraints.
 
 ## Parallel_for wrapper
 

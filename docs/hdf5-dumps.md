@@ -1,8 +1,14 @@
 # HDF5 file layout
 
-In allocation group names `view_<index>_<label>`, characters other than letters,
-digits, `_`, `-` and `.` are replaced with `_`, and the label is truncated to
-80 characters. The `label` attribute retains the original allocation label.
+Each HDF5 dump stores a kernel's execution context for replay.
+The `in/` snapshot is written before the kernel runs, and `out/` is added after
+it completes.
+
+In filenames `krepe_<label>_<kernel_id>.h5` and allocation group names
+`view_<index>_<label>`, characters other than letters, digits, `_`, `-` and `.`
+are replaced with `_`, and the label is truncated to 80 characters. Empty labels
+become `unnamed`. The `kernel_label` and `label` attributes retain the original
+kernel and allocation labels.
 
 <div class="hdf5-tree" markdown="1">
 <div class="hdf5-root"><code>/</code></div>
@@ -171,7 +177,7 @@ Select the recorded policy type to see its fields
 
 <ul class="hdf5-fields">
   <li><code>functor</code> <span>Unsigned-byte dataset of the captured functor or lambda object</span></li>
-  <li><code>nvcc_inner_lambda</code> <span>Unsigned-byte dataset of the NVCC inner lambda</span></li>
+  <li><code>nvcc_inner_lambda</code> <span>Unsigned-byte dataset; always present, empty unless an NVCC extended host-device lambda was captured</span></li>
 </ul>
 
 </details>

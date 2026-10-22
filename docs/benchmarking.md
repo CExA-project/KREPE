@@ -39,5 +39,5 @@ int main(int argc, char* argv[]) {
 ```
 
 This option keeps a copy of the inputs in host memory.
-The reset waits for previous work and restores those bytes at the same
-addresses.
+`krepe::reset_inputs()` fences before and after copying those bytes back to
+the same addresses.

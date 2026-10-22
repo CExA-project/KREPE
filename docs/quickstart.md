@@ -9,7 +9,7 @@ are available in the repository's `examples/` directory.
 
 See [Installation](installation.md) for the prerequisites and build instructions.
 
-### capture.cpp
+## capture.cpp
 
 ```cpp
 #include <Kokkos_Core.hpp>
@@ -33,7 +33,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-### replay.cpp
+## replay.cpp
 
 The replay uses the captured data and execution policy. The second argument
 of `krepe::parallel_for` is ignored, so we pass `0`.
@@ -58,7 +58,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-### CMakeLists.txt
+## CMakeLists.txt
 
 ```cmake
 cmake_minimum_required(VERSION 3.26)
