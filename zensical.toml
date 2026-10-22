@@ -6,6 +6,10 @@ site_name = "KREPE"
 site_description = "Kernel Replay Execution for Performance Evaluation"
 site_url = "https://cexa-project.github.io/KREPE/"
 repo_url = "https://github.com/CExA-project/KREPE"
+copyright = """
+  &copy; 2026 Contributors to the KREPE project &mdash;
+  <a href="https://github.com/CExA-project/KREPE/blob/main/LICENSE">MIT License</a>
+"""
 extra_css = ["stylesheets/hdf5-tree.css"]
 
 nav = [
