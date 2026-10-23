@@ -14,8 +14,6 @@ You also need:
   (`HL`) components.
 
 Your Kokkos installation determines the available CPU and GPU backends.
-Use a compatible compiler toolchain to build KREPE. Replace `/path/to/compiler`
-in the commands below with your C++ compiler or CUDA/HIP compiler wrapper.
 
 ## Build and install KREPE
 
@@ -34,9 +32,6 @@ cmake -S . -B build \
 cmake --build build --parallel
 cmake --install build
 ```
-
-`CMAKE_INSTALL_LIBDIR=lib` keeps the tool in `lib/libkrepe.so`, matching the
-[Quickstart](quickstart.md).
 
 If CMake cannot find your HDF5 installation, add
 `-DHDF5_ROOT=/path/to/hdf5` to the configure command above.
