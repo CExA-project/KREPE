@@ -1,0 +1,107 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+name: Documentation
+
+on:
+  pull_request:
+    paths:
+      - "docs/**"
+      - "zensical.toml"
+      - ".github/workflows/docs.yml"
+  push:
+    branches:
+      - main
+      # TODO: Remove this fork preview branch before merging upstream.
+      - docs/website
+    paths:
+      - "docs/**"
+      - "zensical.toml"
+      - ".github/workflows/docs.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Install documentation dependencies
+        run: python -m pip install -r docs/requirements.txt
+
+      # TODO: Remove this fork preview step before merging upstream.
+      - name: Configure fork preview
+        id: preview
+        if: github.event.repository.fork && github.ref == 'refs/heads/docs/website'
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import re
+          from pathlib import Path
+
+          repository = os.environ["GITHUB_REPOSITORY"]
+          owner = os.environ["GITHUB_REPOSITORY_OWNER"]
+          name = repository.split("/", 1)[1]
+          settings = {
+              "site_url": f"https://{owner}.github.io/{name}/",
+              "repo_url": f"{os.environ['GITHUB_SERVER_URL']}/{repository}",
+          }
+          source = Path("zensical.toml").read_text()
+          for key, value in settings.items():
+              source, count = re.subn(
+                  rf"(?m)^{key}\s*=.*$",
+                  lambda _: f"{key} = {json.dumps(value)}",
+                  source,
+              )
+              if count != 1:
+                  raise RuntimeError(f"Expected one {key} setting")
+          Path("zensical.preview.toml").write_text(source)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+              output.write("config_file=zensical.preview.toml\n")
+          PY
+
+      - name: Build documentation
+        # TODO: Remove env and --config-file before merging upstream.
+        env:
+          DOCS_CONFIG_FILE: ${{ steps.preview.outputs.config_file }}
+        run: zensical build --clean --strict --config-file "${DOCS_CONFIG_FILE:-zensical.toml}"
+
+      - name: Upload documentation
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    # TODO: Remove the fork/docs/website clause before merging upstream.
+    if: >-
+      github.event_name != 'pull_request' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event.repository.fork && github.ref == 'refs/heads/docs/website'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      pages: write
+      id-token: write
+
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
