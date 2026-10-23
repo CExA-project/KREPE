@@ -37,7 +37,9 @@ This example uses the default memory and execution spaces, matching the
 `Kokkos::View<int*>` in the replay program.
 
 The allocation label must identify a single allocation in the selected memory
-space, and the dump must contain its reference output.
+space, and the dump must contain its reference output. If several allocations
+share a label, use [krepe::get_allocations](api.md#krepeget_allocations) and pass
+each descriptor to [krepe::compare_views](api.md#krepecompare_views).
 
 ## Access the reference output
 
