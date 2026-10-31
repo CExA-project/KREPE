@@ -151,6 +151,7 @@ jobs:
           echo "KOKKOS_VERSION=$KOKKOS_VERSION"
           echo "Kokkos_ENABLE_SERIAL=${{ matrix.configuration.kokkos_enable_serial }}"
           echo "Kokkos_ENABLE_OPENMP=${{ matrix.configuration.kokkos_enable_openmp }}"
+          echo "Kokkos_ENABLE_DEPRECATED_CODE_5=OFF"
           echo "matrix.compiler=${{ matrix.configuration.compiler }}"
           echo "CMAKE_BUILD_TYPE=${{ matrix.configuration.build_type }}"
           echo "CXX=$CXX"
@@ -178,7 +179,8 @@ jobs:
           -DCMAKE_CXX_COMPILER="$CXX" \
           -DCMAKE_INSTALL_PREFIX="$Kokkos_ROOT" \
           -DKokkos_ENABLE_SERIAL="${{ matrix.configuration.kokkos_enable_serial }}" \
-          -DKokkos_ENABLE_OPENMP="${{ matrix.configuration.kokkos_enable_openmp }}"
+          -DKokkos_ENABLE_OPENMP="${{ matrix.configuration.kokkos_enable_openmp }}" \
+          -DKokkos_ENABLE_DEPRECATED_CODE_5=OFF
         cmake --build kokkos-build --parallel "$(nproc)"
         cmake --install kokkos-build
 
