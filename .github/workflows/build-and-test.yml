@@ -104,6 +104,22 @@ jobs:
             ctest_args: ''
             test_installation: true
 
+        # Also test Kokkos's default configuration with deprecated APIs enabled.
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+          krepe_enable_plugins: OFF
+          configuration:
+            name: gcc Release build and tests with Kokkos deprecated code
+            compiler: gcc-deprecated
+            cxx: g++
+            build_type: Release
+            kokkos_enable_serial: "ON"
+            kokkos_enable_openmp: "OFF"
+            kokkos_enable_deprecated_code_5: "ON"
+            krepe_enable_asan: OFF
+            krepe_enable_ubsan: OFF
+            ctest_args: ''
+            test_installation: true
+
     env:
       CXX: ${{ matrix.configuration.cxx }}
       Kokkos_ROOT: ${{ github.workspace }}/.deps/kokkos-${{ matrix.kokkos_version }}-${{ matrix.configuration.compiler }}
@@ -151,7 +167,7 @@ jobs:
           echo "KOKKOS_VERSION=$KOKKOS_VERSION"
           echo "Kokkos_ENABLE_SERIAL=${{ matrix.configuration.kokkos_enable_serial }}"
           echo "Kokkos_ENABLE_OPENMP=${{ matrix.configuration.kokkos_enable_openmp }}"
-          echo "Kokkos_ENABLE_DEPRECATED_CODE_5=OFF"
+          echo "Kokkos_ENABLE_DEPRECATED_CODE_5=${{ matrix.configuration.kokkos_enable_deprecated_code_5 || 'OFF' }}"
           echo "matrix.compiler=${{ matrix.configuration.compiler }}"
           echo "CMAKE_BUILD_TYPE=${{ matrix.configuration.build_type }}"
           echo "CXX=$CXX"
@@ -180,7 +196,7 @@ jobs:
           -DCMAKE_INSTALL_PREFIX="$Kokkos_ROOT" \
           -DKokkos_ENABLE_SERIAL="${{ matrix.configuration.kokkos_enable_serial }}" \
           -DKokkos_ENABLE_OPENMP="${{ matrix.configuration.kokkos_enable_openmp }}" \
-          -DKokkos_ENABLE_DEPRECATED_CODE_5=OFF
+          -DKokkos_ENABLE_DEPRECATED_CODE_5="${{ matrix.configuration.kokkos_enable_deprecated_code_5 || 'OFF' }}"
         cmake --build kokkos-build --parallel "$(nproc)"
         cmake --install kokkos-build
 
