@@ -12,6 +12,7 @@ on:
   push:
     branches:
     - main
+    - ci/kokkos-5.3.0 # TODO: Remove this branch trigger before merging.
     paths-ignore:
     - README.md
     - docs/**
@@ -37,6 +38,7 @@ jobs:
         - "5.0.0"
         - "5.1.0"
         - "5.2.0"
+        - "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
         krepe_enable_plugins:
         - ON
         - OFF
@@ -64,7 +66,7 @@ jobs:
         # Run extended coverage only for the latest supported version. Update
         # every include entry when rolling the matrix forward.
         include:
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: clang ASan build and tests
@@ -76,7 +78,7 @@ jobs:
             krepe_enable_asan: ON
             krepe_enable_ubsan: OFF
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: clang UBSan build and tests
@@ -88,7 +90,7 @@ jobs:
             krepe_enable_asan: OFF
             krepe_enable_ubsan: ON
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: gcc OpenMP Release build and tests
@@ -159,6 +161,8 @@ jobs:
         cat .kokkos-cache-fingerprint
 
     - name: Cache Kokkos install
+      # Always rebuild release candidates to test their latest fixes.
+      if: ${{ !startsWith(env.KOKKOS_VERSION, 'release-candidate-') }}
       id: cache-kokkos
       uses: actions/cache@v6
       with:
