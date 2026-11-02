@@ -500,9 +500,11 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_team_policy(
   stream << ").set_chunk_size(" << chunk_size << ')';
   if (team_scratch_0 >= 0) {
     stream << ".set_scratch_size(0, Kokkos::PerTeam(" << team_scratch_0
-           << "), Kokkos::PerThread(" << thread_scratch_0 << ")";
+           << "), Kokkos::PerThread(" << thread_scratch_0 << "))";
+  }
+  if (team_scratch_1 >= 0) {
     stream << ".set_scratch_size(1, Kokkos::PerTeam(" << team_scratch_1
-           << "), Kokkos::PerThread(" << thread_scratch_1 << ")";
+           << "), Kokkos::PerThread(" << thread_scratch_1 << "))";
   }
   create_replay_source(stream.str());
 }
