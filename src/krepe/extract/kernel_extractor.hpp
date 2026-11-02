@@ -113,8 +113,8 @@ void register_bounds(const Kokkos::MDRangePolicy<Args...>& policy) {
   const char* outer_dir = iteration_pattern_to_string(Policy::outer_direction);
   const char* inner_dir = iteration_pattern_to_string(Policy::inner_direction);
 
-  // Before Kokkos 5.3, MDRangePolicy was a struct and getting info about the
-  // policy required accessing the members directly
+  // Before Kokkos 5.3, MDRangePolicy was a struct and info about the
+  // policy were obtained by directly accessing the members.
 #if KOKKOS_VERSION_LESS(5, 3, 0)
   auto lower             = policy.m_lower;
   auto upper             = policy.m_upper;
