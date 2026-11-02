@@ -112,11 +112,25 @@ void register_bounds(const Kokkos::MDRangePolicy<Args...>& policy) {
       get_index_type_props<typename Policy::index_type>();
   const char* outer_dir = iteration_pattern_to_string(Policy::outer_direction);
   const char* inner_dir = iteration_pattern_to_string(Policy::inner_direction);
-  register_mdrange_policy(policy.m_space.name(),
-                          schedule_to_string<typename Policy::schedule_type>(),
-                          policy.rank, outer_dir, inner_dir, idx_type_size,
-                          idx_type_signed, policy.m_lower.data(),
-                          policy.m_upper.data(), policy.m_tile.data());
+
+  // Before Kokkos 5.3, MDRangePolicy was a struct and info about the
+  // policy were obtained by directly accessing the members.
+#if KOKKOS_VERSION_LESS(5, 3, 0)
+  auto lower             = policy.m_lower;
+  auto upper             = policy.m_upper;
+  auto tile              = policy.m_tile;
+  const char* space_name = policy.m_space.name();
+#else
+  auto lower             = policy.lower();
+  auto upper             = policy.upper();
+  auto tile              = policy.tile_size();
+  const char* space_name = policy.space().name();
+#endif
+
+  register_mdrange_policy(
+      space_name, schedule_to_string<typename Policy::schedule_type>(),
+      Policy::rank, outer_dir, inner_dir, idx_type_size, idx_type_signed,
+      lower.data(), upper.data(), tile.data());
 }
 
 template <class... Args>
