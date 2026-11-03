@@ -23,15 +23,15 @@ int main(int argc, char* argv[]) {
 #if !defined(KOKKOS_COMPILER_NVCC)
       KOKKOS_LAMBDA(std::integral auto i, std::integral auto j,
                     std::integral auto k) {
-        if constexpr (!std::is_same_v<decltype(i), std::uint32_t> ||
-                      !std::is_same_v<decltype(j), std::uint32_t> ||
-                      !std::is_same_v<decltype(k), std::uint32_t>) {
+        if constexpr (!std::is_same_v<decltype(i), std::uint64_t> ||
+                      !std::is_same_v<decltype(j), std::uint64_t> ||
+                      !std::is_same_v<decltype(k), std::uint64_t>) {
           Kokkos::abort("Fail");
         }
         values(i, j, k) *= 2;
       });
 #else
-      KOKKOS_LAMBDA(std::uint32_t i, std::uint32_t j, std::uint32_t k) {
+      KOKKOS_LAMBDA(std::uint64_t i, std::uint64_t j, std::uint64_t k) {
         values(i, j, k) *= 2;
       });
 #endif
