@@ -102,12 +102,6 @@ template <class... Args>
 void register_bounds(const Kokkos::MDRangePolicy<Args...>& policy) {
   using Policy = Kokkos::MDRangePolicy<Args...>;
 
-  // point_type and tile_type are always std::int64_t
-  static_assert(
-      std::is_same_v<typename Policy::point_type::value_type, std::int64_t>);
-  static_assert(
-      std::is_same_v<typename Policy::tile_type::value_type, std::int64_t>);
-
   const auto [idx_type_size, idx_type_signed] =
       get_index_type_props<typename Policy::index_type>();
   const char* outer_dir = iteration_pattern_to_string(Policy::outer_direction);
@@ -127,10 +121,19 @@ void register_bounds(const Kokkos::MDRangePolicy<Args...>& policy) {
   const char* space_name = policy.space().name();
 #endif
 
+  std::array<std::int64_t, Policy::rank> i64_lower;
+  std::array<std::int64_t, Policy::rank> i64_upper;
+  std::array<std::int64_t, Policy::rank> i64_tile;
+  for (unsigned i = 0; i < Policy::rank; i++) {
+    i64_lower[i] = static_cast<std::int64_t>(lower[i]);
+    i64_upper[i] = static_cast<std::int64_t>(upper[i]);
+    i64_tile[i]  = static_cast<std::int64_t>(tile[i]);
+  }
+
   register_mdrange_policy(
       space_name, schedule_to_string<typename Policy::schedule_type>(),
       Policy::rank, outer_dir, inner_dir, idx_type_size, idx_type_signed,
-      lower.data(), upper.data(), tile.data());
+      i64_lower.data(), i64_upper.data(), i64_tile.data());
 }
 
 template <class... Args>
