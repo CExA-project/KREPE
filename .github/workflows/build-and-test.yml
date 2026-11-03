@@ -33,10 +33,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Keep Release coverage for every supported Kokkos version.
+        # Keep Release coverage for the oldest version, latest stable release,
+        # and release candidate.
         kokkos_version:
         - "5.0.0"
-        - "5.1.0"
         - "5.2.0"
         - "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
         krepe_enable_plugins:
