@@ -32,11 +32,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # Keep Release coverage for every supported Kokkos version.
+        # Keep Release coverage for the oldest version, latest stable release,
+        # and release candidate.
         kokkos_version:
         - "5.0.0"
-        - "5.1.0"
         - "5.2.0"
+        - "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
         krepe_enable_plugins:
         - ON
         - OFF
@@ -64,7 +65,7 @@ jobs:
         # Run extended coverage only for the latest supported version. Update
         # every include entry when rolling the matrix forward.
         include:
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: clang ASan build and tests
@@ -76,7 +77,7 @@ jobs:
             krepe_enable_asan: ON
             krepe_enable_ubsan: OFF
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: clang UBSan build and tests
@@ -88,7 +89,7 @@ jobs:
             krepe_enable_asan: OFF
             krepe_enable_ubsan: ON
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "5.2.0"
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
           krepe_enable_plugins: ON
           configuration:
             name: gcc OpenMP Release build and tests
@@ -97,6 +98,22 @@ jobs:
             build_type: Release
             kokkos_enable_serial: "OFF"
             kokkos_enable_openmp: "ON"
+            krepe_enable_asan: OFF
+            krepe_enable_ubsan: OFF
+            ctest_args: ''
+            test_installation: true
+
+        # Also test Kokkos's default configuration with deprecated APIs enabled.
+        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+          krepe_enable_plugins: OFF
+          configuration:
+            name: gcc Release build and tests with Kokkos deprecated code
+            compiler: gcc-deprecated
+            cxx: g++
+            build_type: Release
+            kokkos_enable_serial: "ON"
+            kokkos_enable_openmp: "OFF"
+            kokkos_enable_deprecated_code_5: "ON"
             krepe_enable_asan: OFF
             krepe_enable_ubsan: OFF
             ctest_args: ''
@@ -149,6 +166,7 @@ jobs:
           echo "KOKKOS_VERSION=$KOKKOS_VERSION"
           echo "Kokkos_ENABLE_SERIAL=${{ matrix.configuration.kokkos_enable_serial }}"
           echo "Kokkos_ENABLE_OPENMP=${{ matrix.configuration.kokkos_enable_openmp }}"
+          echo "Kokkos_ENABLE_DEPRECATED_CODE_5=${{ matrix.configuration.kokkos_enable_deprecated_code_5 || 'OFF' }}"
           echo "matrix.compiler=${{ matrix.configuration.compiler }}"
           echo "CMAKE_BUILD_TYPE=${{ matrix.configuration.build_type }}"
           echo "CXX=$CXX"
@@ -159,6 +177,8 @@ jobs:
         cat .kokkos-cache-fingerprint
 
     - name: Cache Kokkos install
+      # Always rebuild release candidates to test their latest fixes.
+      if: ${{ !startsWith(env.KOKKOS_VERSION, 'release-candidate-') }}
       id: cache-kokkos
       uses: actions/cache@v6
       with:
@@ -174,7 +194,8 @@ jobs:
           -DCMAKE_CXX_COMPILER="$CXX" \
           -DCMAKE_INSTALL_PREFIX="$Kokkos_ROOT" \
           -DKokkos_ENABLE_SERIAL="${{ matrix.configuration.kokkos_enable_serial }}" \
-          -DKokkos_ENABLE_OPENMP="${{ matrix.configuration.kokkos_enable_openmp }}"
+          -DKokkos_ENABLE_OPENMP="${{ matrix.configuration.kokkos_enable_openmp }}" \
+          -DKokkos_ENABLE_DEPRECATED_CODE_5="${{ matrix.configuration.kokkos_enable_deprecated_code_5 || 'OFF' }}"
         cmake --build kokkos-build --parallel "$(nproc)"
         cmake --install kokkos-build
 
