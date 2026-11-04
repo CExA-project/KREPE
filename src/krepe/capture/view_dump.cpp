@@ -105,7 +105,7 @@ void write_int_attribute(hid_t object, const char* name, int value) {
 
 template <class T>
 auto Hdf5Datatype() {
-  if constexpr (std::is_same_v<T, unsigned char>) {
+  if constexpr (std::is_same_v<T, std::byte>) {
     return H5T_NATIVE_UCHAR;
   } else if constexpr (std::is_same_v<T, std::int64_t>) {
     return H5T_NATIVE_INT64;
@@ -211,7 +211,7 @@ void write_allocation_group(hid_t views_group,
   write_uint64_attribute(group.get(), "reported_size",
                          allocation.record.reported_size);
 
-  std::vector<unsigned char> bytes;
+  std::vector<std::byte> bytes;
   const std::string skip_reason = copy_allocation_bytes(allocation, bytes);
   write_int_attribute(group.get(), "bytes_dumped", skip_reason.empty() ? 1 : 0);
   if (!skip_reason.empty()) {
@@ -250,8 +250,8 @@ void write_snapshot(hid_t file, const char* name,
 
 ViewDumpResult create_kernel_dump(
     const AllocationSnapshot& input_snapshot,
-    const std::vector<unsigned char>& functor_data,
-    const std::vector<unsigned char>& nvcc_inner_lambda_data,
+    const std::vector<std::byte>& functor_data,
+    const std::vector<std::byte>& nvcc_inner_lambda_data,
     const std::unordered_map<std::string, std::string>& metadata,
     const std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
                        krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,

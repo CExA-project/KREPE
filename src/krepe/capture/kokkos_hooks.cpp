@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <atomic>
 #include <charconv>
+#include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <optional>
@@ -74,8 +75,8 @@ std::unordered_map<std::string, std::uint64_t> kernel_invocations;
 Kokkos_Tools_toolInvokedFenceFunction tool_fence = nullptr;
 
 krepe::AllocationTracker allocation_tracker;
-std::vector<unsigned char> functor_data;
-std::vector<unsigned char> nvcc_inner_lambda_data;
+std::vector<std::byte> functor_data;
+std::vector<std::byte> nvcc_inner_lambda_data;
 std::unordered_map<std::string, std::string> metadata;
 std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
              krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,
@@ -202,7 +203,7 @@ bool should_track_allocation(const char* label, const void* ptr) {
 }
 
 const void* allocation_data_pointer(const void* ptr) {
-  return static_cast<const unsigned char*>(ptr) +
+  return static_cast<const std::byte*>(ptr) +
          KREPE_KOKKOS_ALLOCATION_HEADER_SIZE;
 }
 
@@ -369,16 +370,16 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_add_metadata(const char* key,
   metadata[key] = std::string(value, size);
 }
 
-KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_copy_functor(
-    const unsigned char* data, std::size_t size) {
+KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_copy_functor(const std::byte* data,
+                                                        std::size_t size) {
   functor_data.resize(size);
   std::memcpy(functor_data.data(), data, size);
   nvcc_inner_lambda_data.clear();
 }
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_copy_nvcc_lambda(
-    const unsigned char* data, std::size_t size,
-    const unsigned char* inner_functor_data, std::size_t inner_functor_size) {
+    const std::byte* data, std::size_t size,
+    const std::byte* inner_functor_data, std::size_t inner_functor_size) {
   functor_data.resize(size);
   std::memcpy(functor_data.data(), data, size);
   nvcc_inner_lambda_data.resize(inner_functor_size);

@@ -3,8 +3,8 @@
 set -o pipefail
 shopt -s nullglob
 
-if [ $# -lt 3 ]; then
-  echo "The script expects at least 3 arguments"
+if [ $# -ne 6 ]; then
+  echo "The script expects 6 arguments"
   exit 1
 fi
 
@@ -15,13 +15,8 @@ COMPARE_OUTPUT=0
 if [ "${4:-}" = "TRUE" ]; then
   COMPARE_OUTPUT=1
 fi
-
-if [ $# -ge 4 ]; then
-  shift 4
-else
-  shift 3
-fi
-EXTRA_KOKKOS_TOOLS_ARGS="$*"
+EXTRA_KOKKOS_TOOLS_ARGS=$5
+REPLAYER_ARGS=$6
 
 OUTPUT_DIR=$(mktemp -d)
 REFERENCE_OUTPUT="$OUTPUT_DIR/reference.txt"
@@ -54,7 +49,7 @@ if (( ${#DUMP_FILES[@]} != 1 )); then
   clean_exit 1
 fi
 
-$REPLAY_EXECUTABLE --kernel-replayer-dump="${DUMP_FILES[0]}" | tee "$REPLAY_OUTPUT"
+$REPLAY_EXECUTABLE --kernel-replayer-dump="${DUMP_FILES[0]}" $REPLAYER_ARGS | tee "$REPLAY_OUTPUT"
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne 0 ]; then
   clean_exit $EXIT_CODE

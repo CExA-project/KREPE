@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <string>
 #include <tuple>
 
@@ -22,7 +23,7 @@
 
 namespace krepe::impl {
 
-inline std::pair<char*, std::size_t> get_allocation_address(
+inline std::pair<std::byte*, std::size_t> get_allocation_address(
     void* target_address, std::size_t size, MemorySpaceType space) {
   std::size_t granularity;
   if (space == MemorySpaceType::HOST) {
@@ -37,18 +38,18 @@ inline std::pair<char*, std::size_t> get_allocation_address(
 #endif
   }
 
-  char* aligned_address = reinterpret_cast<char*>(
+  std::byte* aligned_address = reinterpret_cast<std::byte*>(
       ((reinterpret_cast<std::uintptr_t>(target_address)) / granularity) *
       granularity);
-  size += reinterpret_cast<char*>(target_address) - aligned_address;
+  size += static_cast<std::byte*>(target_address) - aligned_address;
 
   std::size_t total_size = (((size - 1) / granularity) + 1) * granularity;
 
   return {aligned_address, total_size};
 }
 
-inline void copy_data(MemorySpaceType space, char* address, char* data,
-                      std::size_t size) {
+inline void copy_data(MemorySpaceType space, std::byte* address,
+                      const std::byte* data, std::size_t size) {
   if (space == MemorySpaceType::HOST) {
     host_copy_data(address, data, size);
   } else {
@@ -69,7 +70,7 @@ struct Allocation {
 
   Allocation() = default;
 
-  Allocation(MemorySpaceType memory_space, char* target_address,
+  Allocation(MemorySpaceType memory_space, std::byte* target_address,
              std::size_t requested_size)
       : memory_space(memory_space) {
     if (memory_space == MemorySpaceType::HOST) {

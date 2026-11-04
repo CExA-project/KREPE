@@ -8,4 +8,4 @@ target_link_libraries(missing_output PRIVATE krepe_warnings krepe_sanitizers Kok
 add_executable(missing_output_replay replay_main.cpp)
 target_link_libraries(missing_output_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(missing_output FALSE)
+add_replay_test(missing_output)

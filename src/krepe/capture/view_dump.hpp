@@ -5,6 +5,7 @@
 
 #include "allocation_tracker.hpp"
 
+#include <cstddef>
 #include <cstdint>
 #include <string>
 #include <string_view>
@@ -68,8 +69,8 @@ struct TeamPolicyDesc {
 
 ViewDumpResult create_kernel_dump(
     const AllocationSnapshot& input_snapshot,
-    const std::vector<unsigned char>& functor_data,
-    const std::vector<unsigned char>& nvcc_inner_lambda_data,
+    const std::vector<std::byte>& functor_data,
+    const std::vector<std::byte>& nvcc_inner_lambda_data,
     const std::unordered_map<std::string, std::string>& metadata,
     const std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
                        krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,

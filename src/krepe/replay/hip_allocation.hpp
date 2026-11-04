@@ -3,6 +3,7 @@
 
 #pragma once
 
+#include <cstddef>
 #include <cstring>
 #include <tuple>
 #include <utility>
@@ -12,7 +13,7 @@
 #define CHECK_HIP_CALL(expr) KOKKOS_IMPL_HIP_SAFE_CALL(expr)
 
 namespace krepe::impl {
-inline auto regular_device_allocate(std::size_t size, char* data) {
+inline auto regular_device_allocate(std::size_t size, const std::byte* data) {
   void* ptr;
   CHECK_HIP_CALL(hipMalloc(&ptr, size));
   CHECK_HIP_CALL(hipMemcpy(ptr, data, size, hipMemcpyHostToDevice));
@@ -20,7 +21,8 @@ inline auto regular_device_allocate(std::size_t size, char* data) {
       ptr, [](void* ptr) { CHECK_HIP_CALL(hipFree(ptr)); });
 }
 
-inline void device_copy_data(char* address, char* data, std::size_t size) {
+inline void device_copy_data(std::byte* address, const std::byte* data,
+                             std::size_t size) {
   CHECK_HIP_CALL(hipMemcpy(address, data, size, hipMemcpyHostToDevice));
 }
 

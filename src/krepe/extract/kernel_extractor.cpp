@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
 
 #include "kernel_extractor.hpp"
+#include <cstddef>
 #include <iostream>
 #if defined(KOKKOS_ENABLE_LIBDL)
 #include <dlfcn.h>
@@ -13,9 +14,9 @@ namespace krepe {
 namespace impl {
 
 void (*add_metadata_function)(const char*, const char*, std::size_t) = nullptr;
-void (*copy_functor_function)(const unsigned char*, std::size_t)     = nullptr;
-void (*copy_nvcc_lambda_function)(const unsigned char*, std::size_t,
-                                  const unsigned char*, std::size_t) = nullptr;
+void (*copy_functor_function)(const std::byte*, std::size_t)         = nullptr;
+void (*copy_nvcc_lambda_function)(const std::byte*, std::size_t,
+                                  const std::byte*, std::size_t)     = nullptr;
 void (*register_scalar_policy_function)(std::uint64_t)               = nullptr;
 void (*register_range_policy_function)(const char*, const char*, std::size_t,
                                        bool, std::uint64_t, std::uint64_t,
@@ -81,9 +82,9 @@ void init_internal_functions() {
       has_kernel_dump_tool = true;
     } else {
       add_metadata_function     = [](const char*, const char*, std::size_t) {};
-      copy_functor_function     = [](const unsigned char*, std::size_t) {};
-      copy_nvcc_lambda_function = [](const unsigned char*, std::size_t,
-                                     const unsigned char*, std::size_t) {};
+      copy_functor_function     = [](const std::byte*, std::size_t) {};
+      copy_nvcc_lambda_function = [](const std::byte*, std::size_t,
+                                     const std::byte*, std::size_t) {};
       register_scalar_policy_function = [](std::uint64_t) {};
       register_range_policy_function = [](const char*, const char*, std::size_t,
                                           bool, std::uint64_t, std::uint64_t,
@@ -103,13 +104,13 @@ void init_internal_functions() {
   }
 }
 
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size) {
+void copy_functor(const std::byte* functor_data, std::size_t functor_size) {
   init_internal_functions();
   copy_functor_function(functor_data, functor_size);
 }
 
-void copy_functor(const unsigned char* functor_data, std::size_t functor_size,
-                  const unsigned char* inner_functor_data,
+void copy_functor(const std::byte* functor_data, std::size_t functor_size,
+                  const std::byte* inner_functor_data,
                   std::size_t inner_functor_size) {
   init_internal_functions();
   copy_nvcc_lambda_function(functor_data, functor_size, inner_functor_data,

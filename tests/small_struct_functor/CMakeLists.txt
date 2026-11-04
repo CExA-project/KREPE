@@ -9,4 +9,4 @@ target_link_libraries(
   small_struct_functor_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized
 )
 
-add_replay_test(small_struct_functor TRUE)
+add_replay_test(small_struct_functor COMPARE_OUTPUT)

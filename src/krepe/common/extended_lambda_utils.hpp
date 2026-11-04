@@ -72,7 +72,7 @@ std::size_t hdl_host_lambda_size(
 // We assume that it is the last member of __nv_hdl_wrapper_t.
 template <class Functor>
 void* hdl_host_lambda_pointer(Functor&& f) {
-  unsigned char* data = reinterpret_cast<unsigned char*>(&f);
+  std::byte* data = reinterpret_cast<std::byte*>(&f);
   return *reinterpret_cast<void**>((data + sizeof(f)) - sizeof(void*));
 }
 

@@ -4,6 +4,7 @@
 #include <Kokkos_Core.hpp>
 #include <algorithm>
 #include <cassert>
+#include <cstddef>
 #include <exception>
 #include <iterator>
 #include <map>
@@ -33,8 +34,8 @@ void remove_cli_args(int& argc, char* argv[], int pos, int n) {
   argc -= n;
 }
 
-std::string_view find_flag_argument(int& argc, char* argv[],
-                                    std::string_view flag) {
+std::string_view find_cli_option(int& argc, char* argv[],
+                                 std::string_view flag) {
   std::string_view argument;
   for (int i = 1; i < argc; i++) {
     std::string_view current_arg{argv[i]};
@@ -59,6 +60,17 @@ std::string_view find_flag_argument(int& argc, char* argv[],
   }
 
   return argument;
+}
+
+bool find_cli_flag(int& argc, char* argv[], std::string_view flag) {
+  for (int i = 1; i < argc; i++) {
+    if (argv[i] == flag) {
+      remove_cli_args(argc, argv, i, 1);
+      return true;
+    }
+  }
+
+  return false;
 }
 
 void device_init() {
@@ -94,9 +106,9 @@ void device_init() {
   }
 }
 
-static std::vector<char> functor_data;
+static std::vector<std::byte> functor_data;
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
-static std::vector<char> nvcc_inner_lambda_data;
+static std::vector<std::byte> nvcc_inner_lambda_data;
 
 namespace krepe::impl {
 void* copy_extended_lambda_inner_lambda(void* inner_lambda_ptr,
@@ -127,6 +139,13 @@ namespace impl {
 
 static const ReplayAllocations* replay_allocations = nullptr;
 static std::unordered_map<std::string, const std::string> metadata;
+static bool krepe_is_initialized = false;
+static bool input_reset_enabled  = false;
+// ScopeGuard used internally by krepe::initialize and krepe::finalize
+static std::unique_ptr<ScopeGuard> initialize_internal_scope_guard;
+// Pointer to the ScopeGuard that was either created by the user or by
+// krepe::initialize
+static ScopeGuard* scope_guard = nullptr;
 
 static void check_replay_allocations(
     [[maybe_unused]] MemorySpaceType memory_space) {
@@ -250,7 +269,7 @@ void validate_comparison(const ReplayAllocation& allocation,
   }
 }
 
-void init_functor(char* buffer, std::size_t size) {
+void init_functor(std::byte* buffer, std::size_t size) {
   if (functor_data.size() < size) {
     throw std::runtime_error(
         "The stored functor is smaller than the requested functor, expected at "
@@ -261,9 +280,9 @@ void init_functor(char* buffer, std::size_t size) {
   std::memcpy(buffer, functor_data.data(), size);
 }
 
-char* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
+std::byte* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
   if (mem == MemorySpaceType::HOST) {
-    return new char[size];
+    return new std::byte[size];
   } else {
     void* ptr = nullptr;
 #if defined(KOKKOS_ENABLE_CUDA)
@@ -271,11 +290,11 @@ char* allocate_host_buffer(std::size_t size, MemorySpaceType mem) {
 #elif defined(KOKKOS_ENABLE_HIP)
     KOKKOS_IMPL_HIP_SAFE_CALL(hipHostMalloc(&ptr, size));
 #endif
-    return static_cast<char*>(ptr);
+    return static_cast<std::byte*>(ptr);
   }
 }
 
-void free_host_buffer(char* ptr, MemorySpaceType mem) {
+void free_host_buffer(std::byte* ptr, MemorySpaceType mem) {
   if (mem == MemorySpaceType::HOST) {
     delete[] ptr;
   } else {
@@ -290,14 +309,14 @@ void free_host_buffer(char* ptr, MemorySpaceType mem) {
 struct SnapshotAllocation {
   std::string label;
   std::string space;
-  char* allocation_id;
-  char* address;
+  std::byte* allocation_id;
+  std::byte* address;
   std::size_t size;
   bool bytes_dumped;
 };
 
 using hdf5_iterate_fun_t =
-    std::function<void(const SnapshotAllocation&, char*)>;
+    std::function<void(const SnapshotAllocation&, const std::byte*)>;
 
 void iterate_allocations(hid_t file, const char* path, H5L_iterate_t callback,
                          void* data) {
@@ -395,7 +414,7 @@ std::uint64_t get_hdf5_uint64_attribute(hid_t group, const char* name,
 
 SnapshotAllocation read_allocation_info(hid_t group, const char* name) {
   const auto pointer_attribute = [&](const char* attribute) {
-    return reinterpret_cast<char*>(std::stoull(
+    return reinterpret_cast<std::byte*>(std::stoull(
         get_hdf5_string_attribute(group, name, attribute), nullptr, 16));
   };
   const auto size = get_hdf5_uint64_attribute(group, name, "size");
@@ -442,7 +461,8 @@ herr_t get_hdf5_dataset_alloc_info(hid_t group, const char* name,
   check_byte_dataset(group, name, entry.size);
   if (entry.size != 0) {
     auto& allocations =
-        *static_cast<std::set<std::pair<char*, std::size_t>>*>(allocation_set);
+        *static_cast<std::set<std::pair<std::byte*, std::size_t>>*>(
+            allocation_set);
     allocations.insert(
         get_allocation_address(entry.address, entry.size, space));
   }
@@ -470,8 +490,10 @@ herr_t allocate_hdf5_dataset(hid_t group, const char* name, const H5L_info_t*,
   }
 
   const auto space       = memory_space_type_from_string(entry.space);
-  const auto free_buffer = [space](char* ptr) { free_host_buffer(ptr, space); };
-  std::unique_ptr<char, decltype(free_buffer)> buffer(
+  const auto free_buffer = [space](std::byte* ptr) {
+    free_host_buffer(ptr, space);
+  };
+  std::unique_ptr<std::byte, decltype(free_buffer)> buffer(
       allocate_host_buffer(entry.size, space), free_buffer);
   const std::string dataset = std::string(name) + "/bytes";
   CHECK_HDF5_CALL(
@@ -490,7 +512,7 @@ void read_functor_from_hdf5(hid_t file) {
   std::size_t datatype_size;
   CHECK_HDF5_CALL(H5LTget_dataset_info(file, "functor/functor", &dim, &datatype,
                                        &datatype_size));
-  // We only deal with arrays of chars
+  // We only deal with arrays of bytes
   assert(datatype == H5T_INTEGER);
   assert(datatype_size == 1);
 
@@ -718,13 +740,13 @@ void read_policy_from_hdf5(hid_t file) {
   }
 }
 
-std::vector<std::pair<char*, std::size_t>> compute_allocations(
-    const std::set<std::pair<char*, std::size_t>>& allocations) {
+std::vector<std::pair<std::byte*, std::size_t>> compute_allocations(
+    const std::set<std::pair<std::byte*, std::size_t>>& allocations) {
   if (allocations.empty()) {
     return {};
   }
 
-  std::vector<std::pair<char*, std::size_t>> allocs;
+  std::vector<std::pair<std::byte*, std::size_t>> allocs;
   auto it                              = allocations.begin();
   auto [current_address, current_size] = *(it++);
   for (; it != allocations.end(); ++it) {
@@ -745,10 +767,17 @@ std::vector<std::pair<char*, std::size_t>> compute_allocations(
 }
 }  // namespace impl
 
-ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
-    : enable_input_reset_(enable_input_reset) {
+ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
+  if (impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Constructing a ScopeGuard but krepe has already been initialized");
+  }
+
+  impl::input_reset_enabled =
+      find_cli_flag(argc, argv, "--kernel-replayer-enable-input-reset");
+
   std::string_view hdf5_filename =
-      find_flag_argument(argc, argv, "--kernel-replayer-dump");
+      find_cli_option(argc, argv, "--kernel-replayer-dump");
   if (hdf5_filename.data() == nullptr) {
     throw std::runtime_error(
         "The kernel replayer expects the flag --kernel-replayer-dump");
@@ -758,7 +787,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
       CHECK_HDF5_ID(H5Fopen(hdf5_filename.data(), H5F_ACC_RDONLY, H5P_DEFAULT)),
       H5Fclose);
 
-  std::set<std::pair<char*, std::size_t>> host_allocation_locs;
+  std::set<std::pair<std::byte*, std::size_t>> host_allocation_locs;
 
   impl::iterate_allocations(
       file.get(), "in/views",
@@ -775,7 +804,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
   // we do it after doing the host allocations
   device_init();
 
-  std::set<std::pair<char*, std::size_t>> device_allocation_locs;
+  std::set<std::pair<std::byte*, std::size_t>> device_allocation_locs;
 
   impl::iterate_allocations(
       file.get(), "in/views",
@@ -791,12 +820,12 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
     allocate(impl::MemorySpaceType::DEVICE, address, size);
   }
 
-  std::map<std::pair<char*, std::string>, impl::StoredAllocation*>
+  std::map<std::pair<std::byte*, std::string>, impl::StoredAllocation*>
       allocation_index;
 
   impl::hdf5_iterate_fun_t copy_data_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
-                                char* data) {
+                                const std::byte* data) {
         if (!entry.bytes_dumped) {
           throw std::runtime_error("Missing input bytes for allocation '" +
                                    entry.label + "'");
@@ -810,10 +839,10 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
         const auto space = impl::memory_space_type_from_string(entry.space);
         if (entry.size != 0) {
           impl::copy_data(space, entry.address, data, entry.size);
-          if (enable_input_reset_) {
+          if (impl::input_reset_enabled) {
             input_snapshots_.push_back(
                 {space, entry.address,
-                 std::vector<char>(data, data + entry.size)});
+                 std::vector<std::byte>(data, data + entry.size)});
           }
         }
         const auto allocation = replay_allocations_[space].emplace(
@@ -843,7 +872,7 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
 
   impl::hdf5_iterate_fun_t allocate_wrapper =
       [this, &allocation_index](const impl::SnapshotAllocation& entry,
-                                char* data) {
+                                const std::byte* data) {
         const auto it = allocation_index.find(
             std::make_pair(entry.allocation_id, entry.space));
         if (it == allocation_index.end()) {
@@ -868,19 +897,26 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[], bool enable_input_reset)
   file.close_checked();
 
   impl::replay_allocations = &replay_allocations_;
+
+  impl::krepe_is_initialized = true;
+  impl::scope_guard          = this;
 }
 
 ScopeGuard::~ScopeGuard() {
   if (impl::replay_allocations == &replay_allocations_) {
     impl::replay_allocations = nullptr;
   }
+  impl::scope_guard = nullptr;
 }
 
 void ScopeGuard::reset_inputs() {
-  if (!enable_input_reset_) {
+  if (!impl::input_reset_enabled) {
     throw std::runtime_error(
-        "Input reset must be enabled when constructing krepe::ScopeGuard");
+        "Input reset must be enabled via the "
+        "--kernel-replayer-enable-input-reset flag in order to be able to call "
+        "krepe::reset_inputs()");
   }
+  // FIXME: remove once the scopeguard requires kokkos to be initialized
   if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
     throw std::runtime_error(
         "reset_inputs can be called only inside Kokkos execution environment");
@@ -902,8 +938,8 @@ std::optional<std::string> get_metadata(const std::string& key) {
   }
 }
 
-void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
-                          std::size_t size) {
+void ScopeGuard::allocate(impl::MemorySpaceType memory_space,
+                          std::byte* address, std::size_t size) {
   if (memory_space == impl::MemorySpaceType::HOST) {
     host_raw_allocations.emplace_back(memory_space, address, size);
   } else {
@@ -918,7 +954,7 @@ void ScopeGuard::allocate(impl::MemorySpaceType memory_space, char* address,
 
 void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
                                  const impl::SnapshotAllocation& snapshot,
-                                 char* data) {
+                                 const std::byte* data) {
   if (allocation.output_seen || allocation.descriptor.label != snapshot.label) {
     throw std::runtime_error("Duplicate or inconsistent output allocation '" +
                              snapshot.label + "'");
@@ -942,6 +978,48 @@ void ScopeGuard::allocate_output(impl::StoredAllocation& allocation,
 #endif
   }
   descriptor.reference_data = allocation.reference.get();
+}
+
+void initialize(int& argc, char* argv[]) {
+  if (impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Trying to initialize krepe, but it has already been initialized");
+  }
+
+  impl::initialize_internal_scope_guard =
+      std::make_unique<ScopeGuard>(argc, argv);
+}
+
+void finalize() {
+  if (!impl::krepe_is_initialized) {
+    throw std::runtime_error(
+        "Trying to finalize krepe, but it has not been initialized");
+  }
+
+  // if the internal ScopeGuard is null, either krepe has been initialized by
+  // the user constructing a ScopeGuard (in which case impl::scope_guard is
+  // non-null) or krepe has already been finalized (impl::scope_guard is null)
+  if (!impl::initialize_internal_scope_guard) {
+    if (impl::scope_guard) {
+      throw std::runtime_error(
+          "Trying to call krepe::finalize, but krepe has been initialized by a "
+          "ScopeGuard");
+    } else {
+      throw std::runtime_error(
+          "Trying to call krepe::finalize, but krepe has already been "
+          "finalized");
+    }
+  }
+
+  impl::initialize_internal_scope_guard.reset();
+}
+
+void reset_inputs() {
+  if (impl::scope_guard == nullptr) {
+    throw std::runtime_error("krepe::reset_inputs(): krepe is not initialized");
+  }
+
+  impl::scope_guard->reset_inputs();
 }
 
 }  // namespace krepe

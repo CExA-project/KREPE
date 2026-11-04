@@ -4,6 +4,7 @@
 #include "memory_copy.hpp"
 
 #include <array>
+#include <cstddef>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -11,12 +12,12 @@
 namespace {
 
 int expect_known_empty_allocation_to_succeed(const std::string& space) {
-  const unsigned char allocation_identity = 0;
+  const std::byte allocation_identity{0};
   const krepe::ActiveAllocation allocation{
       &allocation_identity,
       {"empty", space, nullptr, 0, 0, true},
   };
-  std::vector<unsigned char> bytes{0xff};
+  std::vector<std::byte> bytes{std::byte{0xff}};
 
   const std::string reason = krepe::copy_allocation_bytes(allocation, bytes);
   if (!reason.empty()) {
@@ -42,12 +43,12 @@ int main() {
     failures += expect_known_empty_allocation_to_succeed(space);
   }
 
-  const unsigned char allocation_identity = 0;
+  const std::byte allocation_identity{0};
   const krepe::ActiveAllocation unknown_size_allocation{
       &allocation_identity,
       {"unknown", "UnsupportedSpace", nullptr, 0, 0, false},
   };
-  std::vector<unsigned char> bytes;
+  std::vector<std::byte> bytes;
   const std::string reason =
       krepe::copy_allocation_bytes(unknown_size_allocation, bytes);
   if (reason != "allocation data size could not be bounded safely") {
