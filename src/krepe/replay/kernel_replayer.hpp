@@ -63,7 +63,8 @@ class FunctorRestore {
     HostClosure(void** slot, void* host_buffer, std::size_t size)
         : pointer_slot(slot),
           buffer(host_buffer),
-          original(buffer, buffer + size) {}
+          original(static_cast<const std::byte*>(buffer),
+                   static_cast<const std::byte*>(buffer) + size) {}
   };
   std::vector<HostClosure> host_closures_;
 #endif
