@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdlib>
 #include <type_traits>
+#include <utility>
 #include <Kokkos_Macros.hpp>
 
 // Extended lambdas on nvcc are implemented with structs storing a copy of the
@@ -22,9 +23,9 @@
 // the public interface of an extended lambda object. For accessing the buffer,
 // we use the data member of the wrapper struct during the final host
 // compilation phase. For the size, we get the types that are captured from the
-// signature of the wrapper struct and compute their layout using sizeof and
-// alignof of each type. This assumes that the wrapper and host lambda store
-// their captures in the same order and with the same alignment.
+// signature of the wrapper struct and take sizeof a host lambda capturing the
+// same types. Visiting nested captures assumes that the wrapper and host lambda
+// store their captures in the same order and with the same alignment.
 //
 // An alternative would have been to use a user-defined operator new, record
 // all allocated pointers and sizes, and retrieve the size of the allocation
@@ -62,24 +63,9 @@ constexpr std::size_t align_offset(std::size_t offset, std::size_t alignment) {
 
 template <class... CapturedTypes>
 constexpr std::size_t host_capture_size() {
-  if constexpr (sizeof...(CapturedTypes) == 0) {
-    return 1;
-  } else {
-    std::size_t size      = 0;
-    std::size_t alignment = 1;
-
-    const auto add_a_field = [&](std::size_t field_size,
-                                 std::size_t field_alignment) {
-      size = align_offset(size, field_alignment);
-      size += field_size;
-      if (field_alignment > alignment) {
-        alignment = field_alignment;
-      }
-    };
-    (add_a_field(sizeof(CapturedTypes), alignof(CapturedTypes)), ...);
-
-    return align_offset(size, alignment);
-  }
+  return sizeof([](auto&... args) {
+    return [=]() { ((void)args, ...); };
+  }(std::declval<CapturedTypes&>()...));
 }
 
 // Before the host compilation phase, nvcc will try to instantiate the function
