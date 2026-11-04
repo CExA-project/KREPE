@@ -51,7 +51,7 @@ void init_functor(std::byte* buffer, std::size_t size);
 // Save the original bytes of the temporary functor and its nested NVCC host
 // buffers. Restore them in the destructor, including if patching or copying
 // inside execute throws, so the temporary functor can be safely destroyed.
-class FunctorRestore {
+class FunctorRestoreGuard {
   void* storage_;
   std::vector<std::byte> original_;
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
@@ -71,7 +71,7 @@ class FunctorRestore {
 
  public:
   template <class Functor>
-  explicit FunctorRestore(Functor& functor)
+  explicit FunctorRestoreGuard(Functor& functor)
       : storage_(&functor), original_(sizeof(Functor)) {
     std::memcpy(original_.data(), storage_, original_.size());
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
@@ -85,8 +85,8 @@ class FunctorRestore {
 #endif
   }
 
-  FunctorRestore(const FunctorRestore&)            = delete;
-  FunctorRestore& operator=(const FunctorRestore&) = delete;
+  FunctorRestoreGuard(const FunctorRestoreGuard&)            = delete;
+  FunctorRestoreGuard& operator=(const FunctorRestoreGuard&) = delete;
 
   void execute() {
     init_functor(static_cast<std::byte*>(storage_), original_.size());
@@ -105,7 +105,7 @@ class FunctorRestore {
 #endif
   }
 
-  ~FunctorRestore() {
+  ~FunctorRestoreGuard() {
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
     for (auto it = host_closures_.rbegin(); it != host_closures_.rend(); ++it) {
       std::memcpy(it->buffer, it->original.data(), it->original.size());
@@ -669,7 +669,7 @@ Functor replay_functor(const Functor& functor) {
     tracking.emplace();
   }
   Functor functor_working_copy(functor);
-  impl::FunctorRestore restore(functor_working_copy);
+  impl::FunctorRestoreGuard restore(functor_working_copy);
   restore.execute();
   // The return value is constructed before restore's destructor runs and
   // functor_working_copy is destroyed. NVCC also copies the host closures of
