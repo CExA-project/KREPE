@@ -119,21 +119,38 @@ template <class... Args>
 void register_bounds(const Kokkos::MDRangePolicy<Args...>& policy) {
   using Policy = Kokkos::MDRangePolicy<Args...>;
 
-  // point_type and tile_type are always std::int64_t
-  static_assert(
-      std::is_same_v<typename Policy::point_type::value_type, std::int64_t>);
-  static_assert(
-      std::is_same_v<typename Policy::tile_type::value_type, std::int64_t>);
-
   const auto [idx_type_size, idx_type_signed] =
       get_index_type_props<typename Policy::index_type>();
   const char* outer_dir = iteration_pattern_to_string(Policy::outer_direction);
   const char* inner_dir = iteration_pattern_to_string(Policy::inner_direction);
-  register_mdrange_policy(policy.m_space.name(),
-                          schedule_to_string<typename Policy::schedule_type>(),
-                          policy.rank, outer_dir, inner_dir, idx_type_size,
-                          idx_type_signed, policy.m_lower.data(),
-                          policy.m_upper.data(), policy.m_tile.data());
+
+  // Before Kokkos 5.3, MDRangePolicy was a struct and info about the
+  // policy were obtained by directly accessing the members.
+#if KOKKOS_VERSION_LESS(5, 3, 0)
+  auto lower             = policy.m_lower;
+  auto upper             = policy.m_upper;
+  auto tile              = policy.m_tile;
+  const char* space_name = policy.m_space.name();
+#else
+  auto lower             = policy.lower();
+  auto upper             = policy.upper();
+  auto tile              = policy.tile_size();
+  const char* space_name = policy.space().name();
+#endif
+
+  std::array<std::int64_t, Policy::rank> i64_lower;
+  std::array<std::int64_t, Policy::rank> i64_upper;
+  std::array<std::int64_t, Policy::rank> i64_tile;
+  for (unsigned i = 0; i < Policy::rank; i++) {
+    i64_lower[i] = static_cast<std::int64_t>(lower[i]);
+    i64_upper[i] = static_cast<std::int64_t>(upper[i]);
+    i64_tile[i]  = static_cast<std::int64_t>(tile[i]);
+  }
+
+  register_mdrange_policy(
+      space_name, schedule_to_string<typename Policy::schedule_type>(),
+      Policy::rank, outer_dir, inner_dir, idx_type_size, idx_type_signed,
+      i64_lower.data(), i64_upper.data(), i64_tile.data());
 }
 
 template <class... Args>

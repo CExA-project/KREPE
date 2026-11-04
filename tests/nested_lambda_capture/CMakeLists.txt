@@ -7,7 +7,7 @@ target_link_libraries(nested_lambda_capture PRIVATE krepe_warnings krepe_sanitiz
 add_executable(nested_lambda_capture_replay replay_main.cpp)
 target_link_libraries(nested_lambda_capture_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(nested_lambda_capture FALSE)
+add_replay_test(nested_lambda_capture)
 
 add_executable(nested_lambda_capture_host host_main.cpp)
 target_link_libraries(
@@ -19,4 +19,4 @@ target_link_libraries(
   nested_lambda_capture_host_replay PRIVATE krepe_warnings krepe_sanitizers Kokkos::kokkos kernel_replayer_sanitized
 )
 
-add_replay_test(nested_lambda_capture_host FALSE)
+add_replay_test(nested_lambda_capture_host)

@@ -180,16 +180,17 @@ the `--kernel-replayer-dump` command line flag:
 
 ### Repeating a replay with the same inputs
 
-```cpp
-krepe::ScopeGuard replay_scope(argc, argv, /*enable_input_reset=*/true);
-Kokkos::ScopeGuard kokkos_scope(argc, argv);
+It is possible to reset the input views in the replayed program to their
+original value, by calling `krepe::reset_inputs()`. In order to enable this
+functionality, you should add the `--kernel-replayer-enable-input-reset` when
+launching the replayed program.
 
-replay_scope.reset_inputs();
+```sh
+./replay_prog --kernel-replayer-dump=krepe_scale_2.h5 --kernel-replayer-enable-input-reset
 ```
 
-This option stores a copy of the inputs in host memory. `reset_inputs()` waits
-for previous work and restores those bytes at the same addresses, completing
-all copies before returning.
+Note that calling `reset_inputs` will fence before and after the memory copies
+required to restore the data.
 
 ### Modifying the execution policy
 

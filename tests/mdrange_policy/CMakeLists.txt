@@ -7,4 +7,4 @@ target_link_libraries(mdrange_policy PRIVATE krepe_warnings krepe_sanitizers Kok
 add_executable(mdrange_policy_replay replay_main.cpp)
 target_link_libraries(mdrange_policy_replay PRIVATE krepe_warnings Kokkos::kokkos kernel_replayer)
 
-add_replay_test(mdrange_policy FALSE)
+add_replay_test(mdrange_policy)
