@@ -12,7 +12,6 @@ on:
   push:
     branches:
     - main
-    - ci/kokkos-5.3.0 # TODO: Remove this branch trigger before merging.
     paths-ignore:
     - README.md
     - docs/**
