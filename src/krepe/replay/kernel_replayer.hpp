@@ -56,12 +56,12 @@ class FunctorRestoreGuard {
   std::vector<std::byte> original_;
 #if defined(KERNEL_REPLAYER_USE_NVCC_HDL_WORKAROUND)
   struct HostClosure {
-    void** pointer_slot;
+    void** buffer_ptr;
     void* buffer;
     std::vector<std::byte> original;
 
     HostClosure(void** slot, void* host_buffer, std::size_t size)
-        : pointer_slot(slot),
+        : buffer_ptr(slot),
           buffer(host_buffer),
           original(static_cast<const std::byte*>(buffer),
                    static_cast<const std::byte*>(buffer) + size) {}
@@ -97,7 +97,7 @@ class FunctorRestoreGuard {
     }
     std::size_t offset = 0;
     for (auto& closure : host_closures_) {
-      std::memcpy(closure.pointer_slot, &closure.buffer, sizeof(void*));
+      std::memcpy(closure.buffer_ptr, &closure.buffer, sizeof(void*));
       init_extended_lambda_host_closure(closure.buffer, closure.original.size(),
                                         offset, total_size);
       offset += closure.original.size();
