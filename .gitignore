@@ -15,6 +15,10 @@ testing/
 CMakeUserPresets.json
 krepe_*.h5
 
+# Documentation environment and generated site
+/.venv/
+/site/
+
 # build directories in source tree
 /build*
 
