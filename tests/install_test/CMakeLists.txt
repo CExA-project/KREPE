@@ -3,13 +3,13 @@
 
 cmake_minimum_required(VERSION 3.26)
 
-project(krepe-test)
+project(KREPE-install-test)
 
 find_package(Kokkos REQUIRED)
-find_package(krepe REQUIRED)
+find_package(KREPE REQUIRED)
 
 add_executable(test main.cpp)
-target_link_libraries(test PRIVATE Kokkos::kokkos krepe::kernel_extractor)
+target_link_libraries(test PRIVATE Kokkos::kokkos KREPE::extractor)
 
 add_executable(replay_test replay_main.cpp)
-target_link_libraries(replay_test PRIVATE Kokkos::kokkos krepe::kernel_replayer)
+target_link_libraries(replay_test PRIVATE Kokkos::kokkos KREPE::replayer)

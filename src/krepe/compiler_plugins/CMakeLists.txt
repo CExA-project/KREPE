@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
 
 add_library(krepe_compiler_plugin INTERFACE)
-install(TARGETS krepe_compiler_plugin EXPORT krepeTargets)
+install(TARGETS krepe_compiler_plugin EXPORT KREPETargets)
 set(KREPE_HAS_COMPILER_PLUGINS FALSE PARENT_SCOPE)
 
 if(NOT KREPE_ENABLE_COMPILER_PLUGINS)

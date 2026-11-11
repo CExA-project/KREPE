@@ -16,13 +16,13 @@ git clone https://github.com/CExA-project/KREPE.git
 
 The library can be included in a CMake project:
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(my_program PRIVATE krepe::kernel_extractor)
+find_package(KREPE REQUIRED)
+target_link_libraries(my_program PRIVATE KREPE::extractor)
 ```
-The replayed program should link with `krepe::kernel_replayer`
+The replayed program should link with `KREPE::replayer`
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(my_program PRIVATE krepe::kernel_replayer)
+find_package(KREPE REQUIRED)
+target_link_libraries(my_program PRIVATE KREPE::replayer)
 ```
 
 ## Extraction
@@ -65,7 +65,7 @@ int main(int argc, char* argv[]) {
   Kokkos::parallel_for(
       "init", values.size(), KOKKOS_LAMBDA(int i) { values(i) = i; });
 
-  // We replace the Kokkos parallel_for with the one from krepe
+  // We replace the Kokkos parallel_for with the one from KREPE
   krepe::parallel_for(
       "scale", N, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
   Kokkos::fence();
@@ -74,7 +74,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-The program has to be linked with `krepe::kernel_extractor`, it then has to be
+The program has to be linked with `KREPE::extractor`, it then has to be
 executed with the following environment variables in order to extract the first
 invocation of the kernel named "scale"
 ```sh
@@ -170,7 +170,7 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-The program has to be linked with `krepe::kernel_replayer`. Pass the dump using
+The program has to be linked with `KREPE::replayer`. Pass the dump using
 the `--krepe-dump-file` command line flag:
 
 ```sh
