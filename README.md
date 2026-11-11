@@ -79,8 +79,7 @@ executed with the following environment variables in order to extract the first
 invocation of the kernel named "scale"
 ```sh
 KOKKOS_TOOLS_LIBS=/path/to/libkrepe.so \
-KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale
---krepe-dump-kernel-invocation=1" \
+KOKKOS_TOOLS_ARGS="--krepe-kernel-label=scale --krepe-kernel-invocation=1" \
 ./prog
 ```
 
@@ -172,21 +171,21 @@ int main(int argc, char* argv[]) {
 ```
 
 The program has to be linked with `krepe::kernel_replayer`. Pass the dump using
-the `--kernel-replayer-dump` command line flag:
+the `--krepe-dump-file` command line flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump=krepe_scale_2.h5
+./replay_prog --krepe-dump-file=krepe_scale_2.h5
 ```
 
 ### Repeating a replay with the same inputs
 
 It is possible to reset the input views in the replayed program to their
 original value, by calling `krepe::reset_inputs()`. In order to enable this
-functionality, you should add the `--kernel-replayer-enable-input-reset` when
+functionality, you should add the `--krepe-enable-input-reset` when
 launching the replayed program.
 
 ```sh
-./replay_prog --kernel-replayer-dump=krepe_scale_2.h5 --kernel-replayer-enable-input-reset
+./replay_prog --krepe-dump-file=krepe_scale_2.h5 --krepe-enable-input-reset
 ```
 
 Note that calling `reset_inputs` will fence before and after the memory copies

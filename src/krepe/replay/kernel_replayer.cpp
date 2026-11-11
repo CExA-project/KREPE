@@ -774,13 +774,13 @@ ScopeGuard::ScopeGuard(int& argc, char* argv[]) {
   }
 
   impl::input_reset_enabled =
-      find_cli_flag(argc, argv, "--kernel-replayer-enable-input-reset");
+      find_cli_flag(argc, argv, "--krepe-enable-input-reset");
 
   std::string_view hdf5_filename =
-      find_cli_option(argc, argv, "--kernel-replayer-dump");
+      find_cli_option(argc, argv, "--krepe-dump-file");
   if (hdf5_filename.data() == nullptr) {
     throw std::runtime_error(
-        "The kernel replayer expects the flag --kernel-replayer-dump");
+        "The kernel replayer expects the flag --krepe-dump-file");
   }
 
   krepe::hdf5::ScopedHandle file(
@@ -912,9 +912,8 @@ ScopeGuard::~ScopeGuard() {
 void ScopeGuard::reset_inputs() {
   if (!impl::input_reset_enabled) {
     throw std::runtime_error(
-        "Input reset must be enabled via the "
-        "--kernel-replayer-enable-input-reset flag in order to be able to call "
-        "krepe::reset_inputs()");
+        "Input reset must be enabled via the --krepe-enable-input-reset flag "
+        "in order to be able to call krepe::reset_inputs()");
   }
   // FIXME: remove once the scopeguard requires kokkos to be initialized
   if (!Kokkos::is_initialized() || Kokkos::is_finalized()) {
