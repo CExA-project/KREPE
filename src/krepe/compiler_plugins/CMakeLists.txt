@@ -32,8 +32,9 @@ macro(add_plugin_dependency TARGET PLUGIN_NAME)
   set(NVCC_EXTRA_FLAG "$<$<BOOL:${KREPE_USES_NVCC_WRAPPER}>:-Xcompiler;>")
   target_compile_options(
     krepe_compiler_plugin
-    INTERFACE $<BUILD_INTERFACE:${NVCC_EXTRA_FLAG}-fplugin=$<TARGET_FILE:${TARGET}>;-include;${DUMMY_PLUGIN_HEADER}>
-              $<INSTALL_INTERFACE:${NVCC_EXTRA_FLAG}-fplugin=$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${PLUGIN_NAME}>
+    INTERFACE
+      $<BUILD_INTERFACE:$<$<COMPILE_LANGUAGE:CXX,CUDA,HIP>:${NVCC_EXTRA_FLAG}-fplugin=$<TARGET_FILE:${TARGET}>;-include;${DUMMY_PLUGIN_HEADER}>>
+      $<INSTALL_INTERFACE:$<$<COMPILE_LANGUAGE:CXX,CUDA,HIP>:${NVCC_EXTRA_FLAG}-fplugin=$<INSTALL_PREFIX>/${CMAKE_INSTALL_LIBDIR}/${PLUGIN_NAME}>>
   )
   add_dependencies(krepe_compiler_plugin dummy)
 endmacro()
