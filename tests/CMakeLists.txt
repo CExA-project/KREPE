@@ -23,7 +23,7 @@ function(add_replay_test TEST_NAME)
   endif()
 
   set(TEST_COMMAND
-      "${TEST_LAUNCHER}" "$<TARGET_FILE:krepe_kokkos_hooks>" "$<TARGET_FILE:${TEST_NAME}>"
+      "${TEST_LAUNCHER}" "$<TARGET_FILE:KREPE::capture>" "$<TARGET_FILE:${TEST_NAME}>"
       "$<TARGET_FILE:${TEST_NAME}_replay>" "${arg_COMPARE_OUTPUT}" "${arg_TOOL_FLAGS}" "${arg_REPLAY_FLAGS}"
   )
 

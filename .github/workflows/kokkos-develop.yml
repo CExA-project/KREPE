@@ -40,7 +40,7 @@ jobs:
       CCACHE_DIR: ${{ github.workspace }}/.ccache
       CCACHE_MAXSIZE: 1G
       Kokkos_ROOT: ${{ github.workspace }}/.deps/kokkos-develop-${{ matrix.compiler }}
-      krepe_ROOT: ${{ github.workspace }}/krepe_install
+      KREPE_ROOT: ${{ github.workspace }}/krepe_install
 
     steps:
     - name: Check out repository
@@ -121,7 +121,7 @@ jobs:
       run: ctest --test-dir build --output-on-failure --no-tests=error --parallel "$(nproc)"
 
     - name: Install the project
-      run: cmake --install build --prefix "$krepe_ROOT"
+      run: cmake --install build --prefix "$KREPE_ROOT"
 
     - name: Test the installation
       working-directory: ${{ github.workspace }}/tests/install_test
@@ -133,9 +133,9 @@ jobs:
           -DCMAKE_CXX_STANDARD=20 \
           -DCMAKE_CXX_STANDARD_REQUIRED=ON \
           -DCMAKE_CXX_EXTENSIONS=OFF \
-          -DCMAKE_PREFIX_PATH="$Kokkos_ROOT;$krepe_ROOT"
+          -DCMAKE_PREFIX_PATH="$Kokkos_ROOT;$KREPE_ROOT"
         cmake --build build --parallel "$(nproc)"
-        KOKKOS_TOOLS_LIBS="$krepe_ROOT/lib/libkrepe.so" KOKKOS_TOOLS_ARGS=--krepe-kernel-label=test_kernel ./build/test
+        KOKKOS_TOOLS_LIBS="$KREPE_ROOT/lib/libkrepe.so" KOKKOS_TOOLS_ARGS=--krepe-kernel-label=test_kernel ./build/test
         shopt -s nullglob
         dumps=(krepe_*.h5)
         test "${#dumps[@]}" -eq 1
