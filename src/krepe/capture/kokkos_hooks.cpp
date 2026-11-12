@@ -86,10 +86,9 @@ std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
 std::string dump_kernel_label;
 std::optional<std::uint64_t> dump_kernel_invocation = 1;
 
-constexpr std::string_view dump_kernel_label_option =
-    "--krepe-dump-kernel-label=";
+constexpr std::string_view dump_kernel_label_option = "--krepe-kernel-label=";
 constexpr std::string_view dump_kernel_invocation_option =
-    "--krepe-dump-kernel-invocation=";
+    "--krepe-kernel-invocation=";
 
 std::string label_or_unknown(const char* label) {
   return label != nullptr ? label : "<unknown>";
