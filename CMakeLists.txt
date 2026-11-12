@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(KREPE_BUILD_EXAMPLES "Build KREPE examples" ON)
+option(KREPE_BUILD_EXAMPLES "Build KREPE examples" OFF)
 option(KREPE_BUILD_TESTS "Build KREPE tests" OFF)
 option(KREPE_ENABLE_WARNINGS "Enable compiler warning options for KREPE targets" ON)
 option(KREPE_ENABLE_ASAN "Enable AddressSanitizer instrumentation" OFF)
