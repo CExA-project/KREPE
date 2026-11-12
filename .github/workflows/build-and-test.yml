@@ -205,6 +205,7 @@ jobs:
           -DCMAKE_BUILD_TYPE="${{ matrix.configuration.build_type }}" \
           -DCMAKE_CXX_COMPILER="$CXX" \
           -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+          -DKREPE_BUILD_EXAMPLES=ON \
           -DKREPE_BUILD_TESTS=ON \
           -DKREPE_ENABLE_WARNINGS=ON \
           -DKREPE_ENABLE_COMPILER_PLUGINS="${{ matrix.krepe_enable_plugins }}" \
