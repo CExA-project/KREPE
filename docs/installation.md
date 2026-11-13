@@ -40,7 +40,7 @@ To adjust the KREPE build, add `-DOPTION=VALUE` to its configure command:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
-| `KREPE_BUILD_EXAMPLES` | `ON` | Build the capture and replay examples. |
+| `KREPE_BUILD_EXAMPLES` | `OFF` | Build the capture and replay examples. |
 | `KREPE_BUILD_TESTS` | `OFF` | Build tests. |
 | `KREPE_ENABLE_WARNINGS` | `ON` | Enable compiler warnings. |
 | `KREPE_ENABLE_ASAN` | `OFF` | Enable AddressSanitizer instrumentation. |
