@@ -2,40 +2,33 @@
 // SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
 
 #include <Kokkos_Core.hpp>
-
-#include <iostream>
+#include <Kokkos_StdAlgorithms.hpp>
 
 #include <krepe/replayer.hpp>
+
+#include <iostream>
+#include <tuple>
 
 int main(int argc, char* argv[]) {
   krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
 
-  constexpr int number_of_values = 1024;
   Kokkos::View<int*> values;
 
-  // Kokkos::parallel_for(
-  //     "fill_values", Kokkos::RangePolicy<>(0, number_of_values),
-  //     KOKKOS_LAMBDA(const int i) { values(i) = i; });
+  // Replay with the captured inputs and policy (the 0 argument is ignored).
+  krepe::parallel_for(
+      "scale", 0, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
+  Kokkos::fence();
 
-  int factor = 0;
+  // Compare the replayed values with the captured output.
+  krepe::compare_views<int*>(
+      "values", std::make_tuple(1024), [](auto expected, auto actual) {
+        if (!Kokkos::Experimental::equal(Kokkos::DefaultExecutionSpace(),
+                                         expected, actual)) {
+          Kokkos::abort("Replay verification failed");
+        }
+      });
+  std::cout << "Replay verified: 1024 values match.\n";
 
-  int sum = 0;
-  Kokkos::parallel_reduce(
-      "sum_values", Kokkos::RangePolicy<>(0, number_of_values),
-      krepe::replay_functor(KOKKOS_LAMBDA(const int i, int& partial_sum) {
-        partial_sum += values(i) * factor;
-      }),
-      sum);
-
-  constexpr int expected_sum =
-      2 * number_of_values * (number_of_values - 1) / 2;
-  if (sum != expected_sum) {
-    std::cerr << "Unexpected Kokkos reduction result: got " << sum
-              << ", expected " << expected_sum << '\n';
-    return 1;
-  }
-
-  std::cout << "Kokkos kernel reduction succeeded: " << sum << '\n';
   return 0;
 }
