@@ -9,11 +9,11 @@
 #include <utility>
 #include <Kokkos_Macros.hpp>
 
-// Extended lambdas on nvcc are implemented with structs storing a copy of the
-// captured variables and a pointer to a heap allocated buffer containing a host
-// only version of the original lambda object. In order to replay an extended
-// lambda we need to copy both the captured variables (used for the device
-// version) and the lambda buffer (used for the host version).
+// Extended lambdas with captures on nvcc are implemented with structs storing a
+// copy of the captured variables and a pointer to a heap allocated buffer
+// containing a host only version of the original lambda object. In order to
+// replay an extended lambda we need to copy both the captured variables (used
+// for the device version) and the lambda buffer (used for the host version).
 //
 // When an extended lambda A captures another extended lambda B, we have to
 // recursively store the host buffer of B, both from the captures of A and
@@ -110,19 +110,20 @@ template <template <bool, bool, bool, class, class, class...> class T,
 void visit_hdl_host_lambdas(const T<IsMutable, HasFuncPtrConv, NeverThrows, Tag,
                                     Fun, CapturedTypes...>& f,
                             Visitor& visitor) {
-  static_assert(
-      !HasFuncPtrConv,
-      "NVCC lambdas with an empty capture list ([]) are not supported");
-  static_assert(host_capture_size<CapturedTypes...>() <= sizeof(f));
-  // NVCC's data member points to the host-only lambda object used when the
-  // extended lambda is called on the host.
+  // Lambdas with an empty capture list ([]) support function-pointer
+  // conversion and have no host buffer to save or restore.
+  if constexpr (!HasFuncPtrConv) {
+    static_assert(host_capture_size<CapturedTypes...>() <= sizeof(f));
+    // NVCC's data member points to the host-only lambda object used when the
+    // extended lambda is called on the host.
 
-  // Visit the parent before its children: restoring its host buffer also
-  // replaces the bytes of the wrappers captured inside that buffer.
-  visitor(&f, const_cast<void**>(&f.data), f.data,
-          host_capture_size<CapturedTypes...>());
-  visit_hdl_captures<CapturedTypes...>(&f, visitor);
-  visit_hdl_captures<CapturedTypes...>(f.data, visitor);
+    // Visit the parent before its children: restoring its host buffer also
+    // replaces the bytes of the wrappers captured inside that buffer.
+    visitor(&f, const_cast<void**>(&f.data), f.data,
+            host_capture_size<CapturedTypes...>());
+    visit_hdl_captures<CapturedTypes...>(&f, visitor);
+    visit_hdl_captures<CapturedTypes...>(f.data, visitor);
+  }
 }
 
 }  // namespace krepe::hdl_utils
