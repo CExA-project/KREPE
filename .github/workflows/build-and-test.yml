@@ -37,7 +37,7 @@ jobs:
         kokkos_version:
         - "5.0.0"
         - "5.2.0"
-        - "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+        - "5.3.0"
         krepe_enable_plugins:
         - ON
         - OFF
@@ -65,7 +65,7 @@ jobs:
         # Run extended coverage only for the latest supported version. Update
         # every include entry when rolling the matrix forward.
         include:
-        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+        - kokkos_version: "5.3.0"
           krepe_enable_plugins: ON
           configuration:
             name: clang ASan build and tests
@@ -77,7 +77,7 @@ jobs:
             krepe_enable_asan: ON
             krepe_enable_ubsan: OFF
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+        - kokkos_version: "5.3.0"
           krepe_enable_plugins: ON
           configuration:
             name: clang UBSan build and tests
@@ -89,7 +89,7 @@ jobs:
             krepe_enable_asan: OFF
             krepe_enable_ubsan: ON
             ctest_args: -L sanitizer_compatible
-        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+        - kokkos_version: "5.3.0"
           krepe_enable_plugins: ON
           configuration:
             name: gcc OpenMP Release build and tests
@@ -104,7 +104,7 @@ jobs:
             test_installation: true
 
         # Also test Kokkos's default configuration with deprecated APIs enabled.
-        - kokkos_version: "release-candidate-5.3.0" # TODO: Use the 5.3.0 tag once released.
+        - kokkos_version: "5.3.0"
           krepe_enable_plugins: OFF
           configuration:
             name: gcc Release build and tests with Kokkos deprecated code
@@ -124,7 +124,7 @@ jobs:
       Kokkos_ROOT: ${{ github.workspace }}/.deps/kokkos-${{ matrix.kokkos_version }}-${{ matrix.configuration.compiler }}
       KOKKOS_VERSION: ${{ matrix.kokkos_version }}
       OMP_NUM_THREADS: "2"
-      krepe_ROOT: ${{ github.workspace }}/krepe_install
+      KREPE_ROOT: ${{ github.workspace }}/krepe_install
 
     steps:
     - name: Check out repository
@@ -205,6 +205,7 @@ jobs:
           -DCMAKE_BUILD_TYPE="${{ matrix.configuration.build_type }}" \
           -DCMAKE_CXX_COMPILER="$CXX" \
           -DCMAKE_COMPILE_WARNING_AS_ERROR=ON \
+          -DKREPE_BUILD_EXAMPLES=ON \
           -DKREPE_BUILD_TESTS=ON \
           -DKREPE_ENABLE_WARNINGS=ON \
           -DKREPE_ENABLE_COMPILER_PLUGINS="${{ matrix.krepe_enable_plugins }}" \
@@ -223,7 +224,7 @@ jobs:
 
     - name: Install the project
       if: ${{ matrix.configuration.test_installation }}
-      run: cmake --install build --prefix "$krepe_ROOT"
+      run: cmake --install build --prefix "$KREPE_ROOT"
 
     - name: Test the installation
       if: ${{ matrix.configuration.test_installation }}
@@ -231,8 +232,8 @@ jobs:
       run: |
         cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.configuration.build_type }}
         cmake --build build --parallel "$(nproc)"
-        KOKKOS_TOOLS_LIBS="$krepe_ROOT/lib/libkrepe.so" KOKKOS_TOOLS_ARGS=--krepe-dump-kernel-label=test_kernel ./build/test
+        KOKKOS_TOOLS_LIBS="$KREPE_ROOT/lib/libkrepe.so" KOKKOS_TOOLS_ARGS=--krepe-kernel-label=test_kernel ./build/test
         shopt -s nullglob
         dumps=(krepe_*.h5)
         test "${#dumps[@]}" -eq 1
-        ./build/replay_test --kernel-replayer-dump="${dumps[0]}"
+        ./build/replay_test --krepe-dump-file="${dumps[0]}"

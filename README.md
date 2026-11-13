@@ -24,15 +24,15 @@ git clone https://github.com/CExA-project/KREPE.git
 The library can be included in a CMake project:
 
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(my_program PRIVATE krepe::kernel_extractor)
+find_package(KREPE REQUIRED)
+target_link_libraries(my_program PRIVATE KREPE::extractor)
 ```
 
-The replayed program should link with `krepe::kernel_replayer`
+The replayed program should link with `KREPE::replayer`
 
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(my_program PRIVATE krepe::kernel_replayer Kokkos::kokkos)
+find_package(KREPE REQUIRED)
+target_link_libraries(my_program PRIVATE KREPE::replayer Kokkos::kokkos)
 ```
 
 ## Extraction
@@ -67,13 +67,13 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-The program has to be linked with `krepe::kernel_extractor`, it then has to be
+The program has to be linked with `KREPE::extractor`, it then has to be
 executed with the following environment variables in order to extract the first
 invocation of the kernel named "scale"
 
 ```sh
 KOKKOS_TOOLS_LIBS=/path/to/libkrepe.so \
-KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale --krepe-dump-kernel-invocation=1" \
+KOKKOS_TOOLS_ARGS="--krepe-kernel-label=scale --krepe-kernel-invocation=1" \
 ./prog
 ```
 
@@ -140,11 +140,11 @@ int main(int argc, char* argv[]) {
 }
 ```
 
-The program has to be linked with `krepe::kernel_replayer`. Pass the dump using
-the `--kernel-replayer-dump` command line flag:
+The program has to be linked with `KREPE::replayer`. Pass the dump using
+the `--krepe-dump-file` command line flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump="krepe_scale_<kernel_id>.h5"
+./replay_prog --krepe-dump-file="krepe_scale_<kernel_id>.h5"
 ```
 
 Replace `krepe_scale_<kernel_id>.h5` with the filename reported during capture.
@@ -153,7 +153,7 @@ Complete [capture](examples/kokkos_kernel_example.cpp) and
 
 ### Repeating a replay with the same inputs
 
-Enable `--kernel-replayer-enable-input-reset`, then call `krepe::reset_inputs()`
+Enable `--krepe-enable-input-reset`, then call `krepe::reset_inputs()`
 before each replay to restore the captured inputs.
 See [Benchmarking & auto-tuning](https://cexa-project.github.io/KREPE/benchmarking/)
 for the input reset option and a replay loop example.

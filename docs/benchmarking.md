@@ -5,11 +5,11 @@ plan to simplify integration with [APEX](https://github.com/UO-OACISS/apex).
 
 ## Repeating a replay with the same inputs
 
-Enable input reset with the `--kernel-replayer-enable-input-reset` flag:
+Enable input reset with the `--krepe-enable-input-reset` flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump="krepe_scale_<kernel_id>.h5" \
-  --kernel-replayer-enable-input-reset
+./replay_prog --krepe-dump-file="krepe_scale_<kernel_id>.h5" \
+  --krepe-enable-input-reset
 ```
 
 Replace `krepe_scale_<kernel_id>.h5` with the dump path reported during capture.

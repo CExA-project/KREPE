@@ -14,7 +14,7 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-option(KREPE_BUILD_EXAMPLES "Build KREPE examples" ON)
+option(KREPE_BUILD_EXAMPLES "Build KREPE examples" OFF)
 option(KREPE_BUILD_TESTS "Build KREPE tests" OFF)
 option(KREPE_ENABLE_WARNINGS "Enable compiler warning options for KREPE targets" ON)
 option(KREPE_ENABLE_ASAN "Enable AddressSanitizer instrumentation" OFF)
@@ -27,6 +27,7 @@ option(KREPE_GCC_PLUGIN_HEADERS_DIR
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 add_library(krepe_warnings INTERFACE)
+add_library(KREPE::warnings ALIAS krepe_warnings)
 
 if(KREPE_ENABLE_WARNINGS)
   target_compile_options(
@@ -35,6 +36,7 @@ if(KREPE_ENABLE_WARNINGS)
 endif()
 
 add_library(krepe_sanitizers INTERFACE)
+add_library(KREPE::sanitizers ALIAS krepe_sanitizers)
 
 if(KREPE_ENABLE_ASAN OR KREPE_ENABLE_UBSAN)
   target_compile_options(krepe_sanitizers INTERFACE -fno-omit-frame-pointer)
@@ -70,20 +72,20 @@ if(KREPE_BUILD_TESTS)
   add_subdirectory(tests)
 endif()
 
-write_basic_package_version_file(krepeConfigVersion.cmake COMPATIBILITY SameMajorVersion)
+write_basic_package_version_file(KREPEConfigVersion.cmake COMPATIBILITY SameMajorVersion)
 
 configure_package_config_file(
-  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/krepeConfig.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/krepeConfig.cmake"
-  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/krepe"
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/KREPEConfig.cmake.in" "${CMAKE_CURRENT_BINARY_DIR}/KREPEConfig.cmake"
+  INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/KREPE"
 )
 
 install(
-  EXPORT krepeTargets
-  FILE krepeTargets.cmake
-  NAMESPACE krepe::
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/krepe"
+  EXPORT KREPETargets
+  FILE KREPETargets.cmake
+  NAMESPACE KREPE::
+  DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/KREPE"
 )
 
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/krepeConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/krepeConfigVersion.cmake"
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/krepe"
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/KREPEConfig.cmake" "${CMAKE_CURRENT_BINARY_DIR}/KREPEConfigVersion.cmake"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/KREPE"
 )

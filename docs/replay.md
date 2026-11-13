@@ -5,11 +5,11 @@ replayed in a separate program.
 
 ## Prepare your application
 
-The replay program has to be linked with `krepe::kernel_replayer`:
+The replay program has to be linked with `KREPE::replayer`:
 
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(replay_prog PRIVATE krepe::kernel_replayer Kokkos::kokkos)
+find_package(KREPE REQUIRED)
+target_link_libraries(replay_prog PRIVATE KREPE::replayer Kokkos::kokkos)
 ```
 
 See [Installation](installation.md) for the KREPE build instructions.
@@ -51,10 +51,10 @@ The local `values` variable stays empty.
 
 ## Run the replay
 
-Pass the dump using the `--kernel-replayer-dump` command-line flag:
+Pass the dump using the `--krepe-dump-file` command-line flag:
 
 ```sh
-./replay_prog --kernel-replayer-dump="krepe_scale_<kernel_id>.h5"
+./replay_prog --krepe-dump-file="krepe_scale_<kernel_id>.h5"
 ```
 
 Replace `krepe_scale_<kernel_id>.h5` with the dump path reported during capture.

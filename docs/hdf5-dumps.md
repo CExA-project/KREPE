@@ -1,7 +1,7 @@
 # HDF5 file layout
 
-Each HDF5 dump stores a kernel's execution context for replay,
-In filenames `krepe_<label>_<kernel_id>.h5`.
+Each HDF5 dump stores a kernel's execution context for replay in a file named
+`krepe_<label>_<kernel_id>.h5`.
 
 
 <div class="hdf5-tree" markdown="1">

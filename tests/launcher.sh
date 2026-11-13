@@ -37,7 +37,7 @@ clean_output() {
 
 rm -f -- *.h5
 
-KOKKOS_TOOLS_LIBS="$LIBKREPE_PATH" KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=test_kernel $EXTRA_KOKKOS_TOOLS_ARGS" $EXECUTABLE | tee "$REFERENCE_OUTPUT"
+KOKKOS_TOOLS_LIBS="$LIBKREPE_PATH" KOKKOS_TOOLS_ARGS="--krepe-kernel-label=test_kernel $EXTRA_KOKKOS_TOOLS_ARGS" $EXECUTABLE | tee "$REFERENCE_OUTPUT"
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne 0 ]; then
   clean_exit $EXIT_CODE
@@ -49,7 +49,7 @@ if (( ${#DUMP_FILES[@]} != 1 )); then
   clean_exit 1
 fi
 
-$REPLAY_EXECUTABLE --kernel-replayer-dump="${DUMP_FILES[0]}" $REPLAYER_ARGS | tee "$REPLAY_OUTPUT"
+$REPLAY_EXECUTABLE --krepe-dump-file="${DUMP_FILES[0]}" $REPLAYER_ARGS | tee "$REPLAY_OUTPUT"
 EXIT_CODE=$?
 if [ $EXIT_CODE -ne 0 ]; then
   clean_exit $EXIT_CODE

@@ -23,7 +23,7 @@ function(add_replay_test TEST_NAME)
   endif()
 
   set(TEST_COMMAND
-      "${TEST_LAUNCHER}" "$<TARGET_FILE:krepe_kokkos_hooks>" "$<TARGET_FILE:${TEST_NAME}>"
+      "${TEST_LAUNCHER}" "$<TARGET_FILE:KREPE::capture>" "$<TARGET_FILE:${TEST_NAME}>"
       "$<TARGET_FILE:${TEST_NAME}_replay>" "${arg_COMPARE_OUTPUT}" "${arg_TOOL_FLAGS}" "${arg_REPLAY_FLAGS}"
   )
 
@@ -49,6 +49,7 @@ add_subdirectory(view_comparison)
 add_subdirectory(missing_output)
 add_subdirectory(view_scalar_capture)
 add_subdirectory(multiple_views_capture)
+add_subdirectory(nested_lambda_capture)
 add_subdirectory(duplicate_labels_capture)
 add_subdirectory(struct_functor)
 add_subdirectory(small_struct_functor)

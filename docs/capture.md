@@ -11,8 +11,8 @@ In order to extract a kernel from a program, you have to:
 The library can be included in a CMake project:
 
 ```cmake
-find_package(krepe REQUIRED)
-target_link_libraries(my_program PRIVATE krepe::kernel_extractor)
+find_package(KREPE REQUIRED)
+target_link_libraries(my_program PRIVATE KREPE::extractor)
 ```
 
 See [Installation](installation.md) for the KREPE build instructions.
@@ -47,13 +47,13 @@ int main(int argc, char* argv[]) {
 
 ## Run the capture
 
-The program has to be linked with `krepe::kernel_extractor`, it then has to be
+The program has to be linked with `KREPE::extractor`, it then has to be
 executed with the following environment variables in order to extract the first
 invocation of the kernel named "scale"
 
 ```sh
 KOKKOS_TOOLS_LIBS=/path/to/libkrepe.so \
-KOKKOS_TOOLS_ARGS="--krepe-dump-kernel-label=scale --krepe-dump-kernel-invocation=1" \
+KOKKOS_TOOLS_ARGS="--krepe-kernel-label=scale --krepe-kernel-invocation=1" \
 ./prog
 ```
 
@@ -62,7 +62,7 @@ Alternatively, use Kokkos command-line arguments:
 ```sh
 ./prog \
   --kokkos-tools-libs=/path/to/libkrepe.so \
-  --kokkos-tools-args="--krepe-dump-kernel-label=scale --krepe-dump-kernel-invocation=1"
+  --kokkos-tools-args="--krepe-kernel-label=scale --krepe-kernel-invocation=1"
 ```
 
 This generates one HDF5 file named `krepe_scale_<kernel_id>.h5`.
@@ -84,6 +84,6 @@ my_funky_parallel_for("kernel", N,
 
 Here, `my_funky_parallel_for` represents your library's wrapper. Use this call
 in the initialized program above and select
-`--krepe-dump-kernel-label=kernel` at runtime.
+`--krepe-kernel-label=kernel` at runtime.
 
 Note that the execution policy cannot be saved in this case.

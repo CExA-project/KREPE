@@ -68,13 +68,13 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-find_package(krepe REQUIRED)
+find_package(KREPE REQUIRED)
 
 add_executable(capture_prog capture.cpp)
-target_link_libraries(capture_prog PRIVATE krepe::kernel_extractor)
+target_link_libraries(capture_prog PRIVATE KREPE::extractor)
 
 add_executable(replay_prog replay.cpp)
-target_link_libraries(replay_prog PRIVATE krepe::kernel_replayer Kokkos::kokkos)
+target_link_libraries(replay_prog PRIVATE KREPE::replayer Kokkos::kokkos)
 ```
 
 ## Build the example
@@ -94,11 +94,11 @@ Load the installed Kokkos tool and select the first invocation of `scale`:
 ```sh
 ./build/capture_prog \
   --kokkos-tools-libs=/path/to/krepe/lib/libkrepe.so \
-  --kokkos-tools-args="--krepe-dump-kernel-label=scale"
+  --kokkos-tools-args="--krepe-kernel-label=scale"
 ```
 
 The first invocation is captured by default. To capture another one, add
-`--krepe-dump-kernel-invocation=N` to `--kokkos-tools-args`.
+`--krepe-kernel-invocation=N` to `--kokkos-tools-args`.
 
 The tool creates a file named `krepe_scale_<kernel_id>.h5` in the current
 directory and reports its path.
@@ -111,7 +111,7 @@ Pass the generated dump to the replay program. Replace
 ```sh
 # Load the captured data and execution policy from the dump.
 ./build/replay_prog \
-  --kernel-replayer-dump="krepe_scale_<kernel_id>.h5"
+  --krepe-dump-file="krepe_scale_<kernel_id>.h5"
 ```
 
 <details markdown="1">
