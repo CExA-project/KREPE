@@ -18,6 +18,7 @@ namespace krepe {
 struct ViewDumpResult {
   bool ok = false;
   std::string filename;
+  std::string replay_filename;
   std::string error;
 };
 
@@ -75,8 +76,8 @@ ViewDumpResult create_kernel_dump(
     const std::variant<krepe::NoPolicyDesc, krepe::ScalarPolicyDesc,
                        krepe::RangePolicyDesc, krepe::MDRangePolicyDesc,
                        krepe::TeamPolicyDesc>& policy,
-    std::string_view label, std::uint64_t kernel_id,
-    std::uint64_t kernel_invocation);
+    const std::string& replay_source, std::string_view label,
+    std::uint64_t kernel_id, std::uint64_t kernel_invocation);
 
 ViewDumpResult append_kernel_output(const AllocationSnapshot& output_snapshot,
                                     std::string_view filename);
