@@ -21,8 +21,8 @@ void krepe_expect(const T& a, const U& b, const char* expr_a,
 #define KREPE_EXPECT(a, b) krepe_expect((a), (b), #a, #b)
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv);
 
   KREPE_EXPECT(krepe::get_metadata("foo").value(), "bar");
   KREPE_EXPECT(krepe::get_metadata("with null bytes").value(),

@@ -6,8 +6,8 @@
 #include <krepe/replayer.hpp>
 
 int main(int argc, char* argv[]) {
-  krepe::ScopeGuard replay_scope(argc, argv);
   Kokkos::ScopeGuard kokkos_scope(argc, argv);
+  krepe::ScopeGuard replay_scope(argc, argv);
 
   const int N = 1024;
   Kokkos::View<int*> values;
