@@ -382,8 +382,10 @@ KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_copy_nvcc_lambda(
   functor_data.resize(size);
   std::memcpy(functor_data.data(), data, size);
   nvcc_inner_lambda_data.resize(inner_functor_size);
-  std::memcpy(nvcc_inner_lambda_data.data(), inner_functor_data,
-              inner_functor_size);
+  if (inner_functor_size != 0) {
+    std::memcpy(nvcc_inner_lambda_data.data(), inner_functor_data,
+                inner_functor_size);
+  }
 }
 
 KOKKOS_HOOKS_EXPORT void krepe_kernel_dump_register_scalar_policy(
