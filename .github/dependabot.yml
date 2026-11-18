@@ -8,6 +8,11 @@ updates:
     schedule:
       interval: "weekly"
 
+  - package-ecosystem: "pip"
+    directory: "/docs"
+    schedule:
+      interval: "weekly"
+
   - package-ecosystem: "pre-commit"
     directory: "/"
     schedule:
