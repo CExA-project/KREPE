@@ -44,6 +44,7 @@ endfunction()
 
 add_subdirectory(no_capture)
 add_subdirectory(scalar_capture)
+add_subdirectory(const_constexpr_capture)
 add_subdirectory(view_capture)
 add_subdirectory(view_comparison)
 add_subdirectory(missing_output)
