@@ -6,7 +6,7 @@ controlled performance evaluation.
 
 See the [documentation](https://cexa-project.github.io/KREPE/) and
 [Quickstart](https://cexa-project.github.io/KREPE/quickstart/) for complete
-guides. Documentation sources are also available in [docs/](docs/).
+guides. Documentation sources are also available in the [docs/](docs/) directory.
 
 ## Build
 

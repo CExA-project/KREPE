@@ -2,8 +2,8 @@
 
 **Kernel Replay Execution for Performance Evaluation**
 
-KREPE captures the execution context of Kokkos kernels and replays them in
-standalone programs for controlled performance evaluation.
+KREPE captures the execution context of Kokkos kernels and allows to replay them in
+standalone programs.
 
 ## Getting started
 

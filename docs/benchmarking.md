@@ -1,11 +1,18 @@
 # Benchmarking & auto-tuning
 
-We plan to add a function to measure kernel execution times. Later, we also
-plan to simplify integration with [APEX](https://github.com/UO-OACISS/apex).
+One issue when replaying a `krepe::parallel_for` is that manually measuring the
+kernel's execution time by placing timers before and after the `parallel_for`
+call will also measure the overhead of the internal operations used to restore
+the execution policy and functor. We plan to address this in the future. Note that
+Kokkos Tools-based timers will still report the right execution time (that of the
+underlying `Kokkos::parallel_for`).
+
+We are also planning to look into integration of KREPE with auto-tuning tools
+such as [APEX](https://github.com/UO-OACISS/apex).
 
 ## Repeating a replay with the same inputs
 
-Enable input reset with the `--krepe-enable-input-reset` flag:
+It might be useful to be able to replay the kernel multiple times in a single execution of the replay program. If you want to be able to reset input data between each kernel execution, you can do so by enabling input reset from the command line with the `--krepe-enable-input-reset` flag:
 
 ```sh
 ./replay_prog --krepe-dump-file="krepe_scale_<kernel_id>.h5" \
@@ -14,7 +21,7 @@ Enable input reset with the `--krepe-enable-input-reset` flag:
 
 Replace `krepe_scale_<kernel_id>.h5` with the dump path reported during capture.
 
-Call `krepe::reset_inputs()` before each replay to restore the captured inputs.
+You can then call `krepe::reset_inputs()` to restore the input allocations to their initial state.
 
 ```cpp
 #include <Kokkos_Core.hpp>

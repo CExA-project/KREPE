@@ -21,7 +21,7 @@ Each HDF5 dump stores a kernel's execution context for replay in a file named
 </details>
 
 <details markdown="1">
-<summary><code>in/</code> <span>Before the kernel</span></summary>
+<summary><code>in/</code> <span>Allocations before the kernel</span></summary>
 
 <ul class="hdf5-fields">
   <li><code>active_allocations</code> <span>Number of allocations in this snapshot</span></li>
@@ -61,7 +61,7 @@ Each HDF5 dump stores a kernel's execution context for replay in a file named
 </details>
 
 <details markdown="1">
-<summary><code>out/</code> <span>After the kernel</span></summary>
+<summary><code>out/</code> <span>State of the allocations after the kernel</span></summary>
 
 <ul class="hdf5-fields">
   <li><code>active_allocations</code> <span>Number of allocations in this snapshot</span></li>

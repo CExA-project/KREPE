@@ -1,24 +1,29 @@
 # Result validation
 
-Validate a replay by comparing its results with the reference output recorded
-during capture. The examples below use the `values` allocation from [Kernel replay](replay.md).
-
-Run these checks after the replayed kernel and its `Kokkos::fence()`, while
-`replay_scope` and `kokkos_scope` are still alive.
+Ensuring that the replayed kernel produces the right results can be done by
+comparing the values of the input allocations (modified by the replayed kernel)
+with the output values captured from the orignal program.
 
 ## Compare the results
 
-`krepe::compare_views` constructs unmanaged Views over the reference output and
-the replayed data, then passes them to your comparison function as `expected`
-and `actual`, respectively. You supply the allocation label, value type and
-dimensions, which must match the captured allocation.
+`krepe::compare_views<TArgs...>(label, view_args, compare)` constructs
+unmanaged Views over the reference output and the replayed data for a specific
+allocation selected by the `label` parameter, it then passes them to the user
+provided `compare` function, which should accept two parameters: the reference
+view and the view containing the replayed data.
 
-After the replay and its fence, compare all integers:
+The template arguments to the function are used as template arguments to the
+constructed Views, `view_args` is a tuple containing the arguments that should
+be passed to the Views' constructor (ususally the dimensions).
+
+The following example compares the `"values"` allocation to its reference, the `expected` and `actual` arguments will be views of type `Kokkos::View<int*, Kokkos::MemoryTraits<Kokkos::Unmanaged>>` with 1024 elements.
 
 ```cpp
 #include <Kokkos_StdAlgorithms.hpp>
 #include <tuple>
-...
+
+// ...
+
 krepe::compare_views<int*>(
     "values", std::make_tuple(1024), [](auto expected, auto actual) {
       if (!Kokkos::Experimental::equal(Kokkos::DefaultExecutionSpace(),
@@ -28,7 +33,7 @@ krepe::compare_views<int*>(
     });
 ```
 
-If several allocations share a label, use [krepe::get_allocations](api.md#krepeget_allocations)
+If several allocations share the same label, use [krepe::get_allocations](api.md#krepeget_allocations)
 and pass each descriptor to [krepe::compare_views](api.md#krepecompare_views).
 
 ## Access the reference output

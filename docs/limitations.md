@@ -1,6 +1,7 @@
 # Limitations
 
 - Only the memory allocations going through Kokkos are captured (e.g. Views, `Kokkos::malloc`)
+- When using the compiler plugins, only allocations corresponding to Views used by the functor will be captured.  Currently, pointers used by the functor are not considered.
 - Kernels taking a single generic argument are not supported
   (`KOKKOS_LAMBDA(auto i) { ... }`), if you still want to keep your kernel
   generic, you can use concepts to constrain the argument to either an integer or

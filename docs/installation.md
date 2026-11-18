@@ -5,13 +5,14 @@ kernels you want to capture or replay.
 
 ## Before you start
 
-KREPE requires Kokkos 5.0 or newer.
+KREPE requires [Kokkos](https://github.com/kokkos/kokkos) 5.0 or newer.
 
 You also need:
 
-- CMake 3.26 or newer and a compiler supporting C++20.
+- A compiler supporting C++20.
+- CMake 3.26 or newer.
 - HDF5 development headers and libraries, including the C and high-level
-  (`HL`) components.
+  (HL) components.
 
 ## Build and install KREPE
 
@@ -24,9 +25,8 @@ cd KREPE
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_COMPILER=/path/to/compiler \
-  -DCMAKE_PREFIX_PATH=/path/to/kokkos \
-  -DCMAKE_INSTALL_PREFIX="$PWD/install" \
-  -DCMAKE_INSTALL_LIBDIR=lib
+  -DCMAKE_INSTALL_PREFIX=/path/to/install/prefix \
+  -DKokkos_ROOT=/path/to/kokkos/install
 cmake --build build --parallel
 cmake --install build
 ```
@@ -36,27 +36,27 @@ If CMake cannot find your HDF5 installation, add
 
 ## Build options
 
-To adjust the KREPE build, add `-DOPTION=VALUE` to its configure command:
+KREPE supports the following CMake options:
 
 | Option | Default | Purpose |
 | --- | --- | --- |
 | `KREPE_BUILD_EXAMPLES` | `OFF` | Build the capture and replay examples. |
-| `KREPE_BUILD_TESTS` | `OFF` | Build tests. |
+| `KREPE_BUILD_TESTS` | `OFF` | Build the tests. |
 | `KREPE_ENABLE_WARNINGS` | `ON` | Enable compiler warnings. |
-| `KREPE_ENABLE_ASAN` | `OFF` | Enable AddressSanitizer instrumentation. |
-| `KREPE_ENABLE_UBSAN` | `OFF` | Enable UndefinedBehaviorSanitizer instrumentation. |
-| `KREPE_ENABLE_COMPILER_PLUGINS` | `ON` | Enable a compiler plugin when supported. |
+| `KREPE_ENABLE_ASAN` | `OFF` | Enable AddressSanitizer instrumentation in the library and the tests. |
+| `KREPE_ENABLE_UBSAN` | `OFF` | Enable UndefinedBehaviorSanitizer instrumentation in the library and the tests. |
+| `KREPE_ENABLE_COMPILER_PLUGINS` | `ON` | Enable a compiler plugin (see below) when supported by the compiler. |
 | `KREPE_GCC_PLUGIN_HEADERS_DIR` | Not set | Path to GCC plugin headers when they cannot be found automatically. |
 
 ### Compiler plugins
 
 By default, if the compiler supports it, we build compiler plugins which allow
 us to have fine-grained control over which allocations are dumped (instead of
-dumping every allocation up to the current kernel launch). They work by
+dumping every allocation up to the target kernel launch). They work by
 introspecting the functor to search for Views contained inside of it, allowing
-to only export allocations which correspond to one of the functor's views.
+us to only export allocations belonging to views used inside the functor.
 Plugins are currently supported for GCC, NVCC using GCC as host compiler, Clang
-and Clang-based compilers (e.g. hipcc).
+and Clang-based compilers (e.g. hipcc) except Intel LLVM.
 
 If needed, compiler plugins can be disabled with `-DKREPE_ENABLE_COMPILER_PLUGINS=OFF`.
 
@@ -71,10 +71,11 @@ will generate and install these headers. You can then configure with
 `-DKREPE_GCC_PLUGIN_HEADERS_DIR=<path/to/headers/installation>` in order to use
 the generated headers.
 
+You can check if your GCC installation supports plugins by ensuring that `gcc -print-file-name=plugin` prints a path to an existing directory (and not just `plugin`) containing some `lib...plugin.so` shared libraries.
+
 #### Clang-based compilers
 
-Install LLVM and Clang development files matching your compiler.
+The clang plugin requires LLVM (and Clang) development files for your clang version.
 
-If you are using Clang or a Clang-based compiler, you might need to specify the
-path to your llvm installation when configuring using
+You might need to specify the path to your llvm installation when configuring using
 `-DLLVM_ROOT=<path/to/llvm>`

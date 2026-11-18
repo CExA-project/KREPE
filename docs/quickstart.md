@@ -1,7 +1,7 @@
 # Quickstart
 
-Capture a kernel that doubles 1024 integers, then replay it in a separate
-program.
+In this example, we capture a simple kernel that doubles the values in a view
+and then replay it in a separate program.
 
 The [capture program](https://github.com/CExA-project/KREPE/blob/main/examples/kokkos_kernel_example.cpp)
 and a [replay program with result checking](https://github.com/CExA-project/KREPE/blob/main/examples/kernel_replay.cpp)
@@ -62,16 +62,17 @@ int main(int argc, char* argv[]) {
 
 ```cmake
 cmake_minimum_required(VERSION 3.26)
-project(krepe_quickstart LANGUAGES C CXX)
+project(krepe_quickstart LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+find_package(Kokkos 5.0 REQUIRED)
 find_package(KREPE REQUIRED)
 
 add_executable(capture_prog capture.cpp)
-target_link_libraries(capture_prog PRIVATE KREPE::extractor)
+target_link_libraries(capture_prog PRIVATE KREPE::extractor Kokkos::kokkos)
 
 add_executable(replay_prog replay.cpp)
 target_link_libraries(replay_prog PRIVATE KREPE::replayer Kokkos::kokkos)
@@ -83,17 +84,18 @@ target_link_libraries(replay_prog PRIVATE KREPE::replayer Kokkos::kokkos)
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_CXX_COMPILER=/path/to/compiler \
-  -DCMAKE_PREFIX_PATH="/path/to/krepe;/path/to/kokkos"
+  -DKokkos_ROOT=/path/to/kokkos/install \
+  -DKREPE_ROOT=/path/to/krepe/install
 cmake --build build --parallel
 ```
 
 ## Capture the kernel
 
-Load the installed Kokkos tool and select the first invocation of `scale`:
+Load the installed Kokkos tool and select the first invocation of the `scale` kernel:
 
 ```sh
 ./build/capture_prog \
-  --kokkos-tools-libs=/path/to/krepe/lib/libkrepe.so \
+  --kokkos-tools-libs=/path/to/krepe/install/lib/libkrepe.so \
   --kokkos-tools-args="--krepe-kernel-label=scale"
 ```
 

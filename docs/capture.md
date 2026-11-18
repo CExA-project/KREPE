@@ -84,6 +84,7 @@ my_funky_parallel_for("kernel", N,
 
 Here, `my_funky_parallel_for` represents your library's wrapper. Use this call
 in the initialized program above and select
-`--krepe-kernel-label=kernel` at runtime.
+`--krepe-kernel-label=kernel` on the command line (assuming that the underlying
+`Kokkos::parallel_for` call uses the same label).
 
 Note that the execution policy cannot be saved in this case.

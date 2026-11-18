@@ -10,6 +10,10 @@
 
 ## Replay lifecycle
 
+### `krepe::initialize`
+
+### `krepe::finalize`
+
 ### `krepe::ScopeGuard`
 
 ### `krepe::reset_inputs`
