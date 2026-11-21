@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+@INCLUDE                = docs/doxygen/common.doxyfile
+
+PROJECT_NAME            = "KREPE capture API"
+PROJECT_BRIEF           = "Public API provided by <krepe/extractor.hpp>"
+OUTPUT_DIRECTORY        = build-docs/doxygen/capture
+INPUT                   = docs/doxygen/capture.dox \
+                          src/krepe/extractor.hpp \
+                          src/krepe/extract/kernel_extractor.hpp

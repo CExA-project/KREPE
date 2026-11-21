@@ -18,6 +18,7 @@ krepe_*.h5
 # Documentation environment and generated site
 /.venv/
 /site/
+/docs/reference/
 
 # build directories in source tree
 /build*

@@ -11,6 +11,7 @@ copyright = """
   <a href="https://github.com/CExA-project/KREPE/blob/main/LICENSE">MIT License</a>
 """
 extra_css = ["stylesheets/hdf5-tree.css"]
+exclude_docs = "/doxygen/"
 
 nav = [
     "index.md",
@@ -21,7 +22,10 @@ nav = [
     { "Result validation" = "validation.md" },
     { "Benchmarking & auto-tuning" = "benchmarking.md" },
     { "Limitations" = "limitations.md" },
-    { "C++ API" = "api.md" },
+    { "C++ API" = [
+        { "Capture" = "reference/capture.md" },
+        { "Replay" = "reference/replay.md" },
+    ] },
     { "HDF5 file layout" = "hdf5-dumps.md" },
     { "Citing KREPE" = "citation.md" },
 ]
