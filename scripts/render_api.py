@@ -5,20 +5,13 @@
 """Render KREPE's public functions and classes from Doxygen XML as Markdown."""
 
 import argparse
-import os
 from pathlib import Path
 import re
 import xml.etree.ElementTree as ET
 
 
 def literal(node):
-    if node is None:
-        return ""
-    if node.tag == "sp":
-        return " "
-    return (node.text or "") + "".join(
-        literal(child) + (child.tail or "") for child in node
-    )
+    return "".join(node.itertext()) if node is not None else ""
 
 
 def text(node):
@@ -31,7 +24,7 @@ def slug(name):
 
 def link(refid):
     path = paths[refid]
-    relative = "" if path == current_page else Path(os.path.relpath(path, current_page.parent)).as_posix()
+    relative = "" if path == current_page else path.name
     return f"{relative}#{anchors[refid]}"
 
 
@@ -46,8 +39,6 @@ def render(node, level=2):
     if tag == "programlisting":
         code = "\n".join(literal(line).rstrip() for line in node.findall("codeline"))
         return f"\n\n```cpp\n{code}\n```\n\n"
-    if tag == "sp":
-        return " "
     if tag == "linebreak":
         return "  \n"
     if tag == "parameterlist":
@@ -90,10 +81,9 @@ def render(node, level=2):
 
 
 def description(node, level=2):
-    return "\n\n".join(filter(None, (
-        render(node.find("briefdescription"), level).strip(),
-        render(node.find("detaileddescription"), level).strip(),
-    )))
+    blocks = (render(node.find(tag), level).strip()
+              for tag in ("briefdescription", "detaileddescription"))
+    return "\n\n".join(filter(None, blocks))
 
 
 def collapsed(content, title="Details"):
@@ -160,30 +150,25 @@ def main(xml_directory, output):
     global anchors, paths, current_page
     output = Path(output)
     xml_directory = Path(xml_directory)
-    namespace = ET.parse(xml_directory / "namespacekrepe.xml").find("compounddef")
-    mainpage = ET.parse(xml_directory / "indexpage.xml").find("compounddef")
-    index = ET.parse(xml_directory / "index.xml").getroot()
-    groups = [ET.parse(xml_directory / (entry.get("refid") + ".xml")).find("compounddef")
-              for entry in index.findall("compound") if entry.get("kind") == "group"]
+
+    def read_compound(refid):
+        compound = ET.parse(xml_directory / f"{refid}.xml").find("compounddef")
+        for space in compound.iter("sp"):
+            space.text = " "
+        return compound
+
+    namespace = read_compound("namespacekrepe")
+    mainpage = read_compound("indexpage")
     compounds = [namespace]
     for compound in compounds:
-        for child in compound.findall("innerclass"):
-            if child.get("prot") == "public":
-                path = xml_directory / (child.get("refid") + ".xml")
-                compounds.append(ET.parse(path).find("compounddef"))
+        for child in compound.findall("innerclass[@prot='public']"):
+            compounds.append(read_compound(child.get("refid")))
 
-    # Doxygen moves grouped declarations into group XML, leaving references
-    # in their original namespace or class.
-    definitions = {member.get("id"): member for compound in compounds + groups
-                   for member in compound.findall("sectiondef/memberdef")}
     members = {}
     for compound in compounds:
-        public = {}
-        for record in compound.findall("sectiondef/*"):
-            member = definitions.get(record.get("id") or record.get("refid"))
-            if (member is not None and member.get("prot") == "public"
-                    and member.get("kind") in ("function", "variable", "typedef")):
-                public[member.get("id")] = member
+        public = {member.get("id"): member
+                  for member in compound.findall("sectiondef/memberdef[@prot='public']")
+                  if member.get("kind") in ("function", "variable", "typedef")}
         members[compound.get("id")] = list(public.values())
     functions = {}
     for member in members[namespace.get("id")]:
@@ -200,47 +185,29 @@ def main(xml_directory, output):
 
     title = mainpage.findtext("title")
     title_anchor = assign(mainpage.get("id"), title)
-    for compound in compounds:
-        name = compound.findtext("compoundname").split("::")[-1]
-        assign(compound.get("id"), name)
-        if compound is namespace:
-            for name, overloads in functions.items():
-                anchor = assign(overloads[0].get("id"), name)
-                for member in overloads:
-                    anchors[member.get("id")] = anchor
-        else:
-            for member in members[compound.get("id")]:
-                assign(member.get("id"), member.findtext("name"))
+    assign(namespace.get("id"), namespace.findtext("compoundname").split("::")[-1])
 
     entries = {}
-    entry_by_ref = {}
     for name, overloads in functions.items():
         key = overloads[0].get("id")
         entries[key] = ("function", overloads)
-        entry_by_ref.update((member.get("id"), key) for member in overloads)
+        anchor = assign(key, name)
+        for member in overloads:
+            anchors[member.get("id")] = anchor
     for compound in compounds[1:]:
         key = compound.get("id")
         entries[key] = ("type", compound)
-        entry_by_ref[key] = key
-        entry_by_ref.update((member.get("id"), key) for member in members[key])
+        assign(key, compound.findtext("compoundname").split("::")[-1])
+        for member in members[key]:
+            assign(member.get("id"), member.findtext("name"))
 
-    remaining = set(entries)
-    sections = []
-    for group in groups:
-        content = []
-        for record in group.iter():
-            refid = record.get("id") if record.tag == "memberdef" else record.get("refid")
-            key = entry_by_ref.get(refid) if record.tag in ("memberdef", "innerclass") else None
-            if key in remaining:
-                content.append(key)
-                remaining.remove(key)
-        if content:
-            assign(group.get("id"), group.findtext("compoundname"))
-            sections.append((group, content))
-
-    paths = {refid: output for refid in anchors}
-    for refid, key in entry_by_ref.items():
-        paths[refid] = output.parent / f"{anchors[key]}.md"
+    paths = dict.fromkeys(anchors, output)
+    for key, (kind, value) in entries.items():
+        page = output.with_name(f"{anchors[key]}.md")
+        page = page.with_suffix(".symbol.md") if page == output else page
+        paths[key] = page
+        page_members = value if kind == "function" else members[key]
+        paths.update((member.get("id"), page) for member in page_members)
 
     def overview(content):
         rows = ["| Name | Description |", "| --- | --- |"]
@@ -251,7 +218,6 @@ def main(xml_directory, output):
             summary = " ".join(render(node.find("briefdescription")).split()).replace("|", "\\|")
             if kind == "function" and len(value) > 1:
                 summary += f" ({len(value)} overloads)"
-            # Keep existing fragment links useful after moving details to their own pages.
             rows.append(f'| <a id="{anchors[key]}"></a>[`{name}`]({link(key)}) | {summary} |')
         return "\n".join(rows)
 
@@ -263,12 +229,8 @@ def main(xml_directory, output):
     introduction, _, guide = description(mainpage).partition("\n\n")
     blocks = [f"# {title} {{ #{title_anchor} }}", introduction,
               f'<a id="{anchors[namespace.get("id")]}"></a>', description(namespace)]
-    for group, content in sections:
-        name = group.findtext("title") or group.findtext("compoundname")
-        blocks.extend((f"## {name} {{ #{anchors[group.get('id')]} }}",
-                       description(group), overview(content)))
     for kind, heading in (("function", "Functions"), ("type", "Types")):
-        content = [key for key in entries if key in remaining and entries[key][0] == kind]
+        content = [key for key, (entry_kind, _) in entries.items() if entry_kind == kind]
         if content:
             blocks.extend((f"## {heading}", overview(content)))
     blocks.append(collapsed(guide, "Usage guide"))
@@ -276,7 +238,7 @@ def main(xml_directory, output):
     for key, (kind, value) in entries.items():
         current_page = paths[key]
         content = function_markdown(value) if kind == "function" else type_markdown(value, members[key])
-        write(current_page, [f"[{title}]({os.path.relpath(output, current_page.parent)})", content])
+        write(current_page, [f"[{title}]({output.name})", content])
 
 
 if __name__ == "__main__":
