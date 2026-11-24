@@ -18,7 +18,7 @@ Follow the [Quickstart](quickstart.md) to capture and replay your first kernel.
 - [Result validation](validation.md)
 - [Benchmarking & auto-tuning](benchmarking.md)
 - [Limitations](limitations.md)
-- C++ API: [Capture](reference/capture.md) and [Replay](reference/replay.md)
+- C++ API: [Capture](reference/capture/index.md) and [Replay](reference/replay/index.md)
 - [HDF5 file layout](hdf5-dumps.md)
 - [Citing KREPE](citation.md)
 
