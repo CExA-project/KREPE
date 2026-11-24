@@ -86,11 +86,12 @@ def description(node, level=2):
     return "\n\n".join(filter(None, blocks))
 
 
-def collapsed(content, title="Details"):
-    if not content.strip():
+def usage_guide(content):
+    content = content.strip()
+    if not content:
         return ""
-    return f'??? abstract "{title}"\n\n' + "\n".join(
-        "    " + line if line else "" for line in content.strip().splitlines()
+    return '??? abstract "Usage guide"\n\n' + "\n".join(
+        "    " + line if line else "" for line in content.splitlines()
     )
 
 
@@ -222,8 +223,8 @@ def main(xml_directory, output):
         return "\n".join(rows)
 
     def write(path, blocks):
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("\n\n".join(block.strip() for block in blocks if block.strip()) + "\n", encoding="utf-8")
+        body = "\n\n".join(filter(None, map(str.strip, blocks)))
+        path.write_text(body + "\n", encoding="utf-8")
 
     current_page = output
     introduction, _, guide = description(mainpage).partition("\n\n")
@@ -233,7 +234,8 @@ def main(xml_directory, output):
         content = [key for key, (entry_kind, _) in entries.items() if entry_kind == kind]
         if content:
             blocks.extend((f"## {heading}", overview(content)))
-    blocks.append(collapsed(guide, "Usage guide"))
+    blocks.append(usage_guide(guide))
+    output.parent.mkdir(parents=True, exist_ok=True)
     write(output, blocks)
     for key, (kind, value) in entries.items():
         current_page = paths[key]
