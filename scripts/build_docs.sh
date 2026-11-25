@@ -18,7 +18,6 @@ rm -rf -- build-docs/doxygen docs/reference
 mkdir -p -- build-docs/doxygen docs/reference
 for api_reference in capture replay; do
   doxygen "docs/doxygen/${api_reference}.doxyfile"
-  python3 scripts/render_api.py "build-docs/doxygen/${api_reference}/xml" \
-    "docs/reference/${api_reference}/index.md"
 done
+python3 scripts/render_api.py --all-apis build-docs/doxygen docs/reference/index.md
 zensical build --clean --strict

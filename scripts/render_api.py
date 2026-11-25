@@ -24,7 +24,7 @@ def slug(name):
 
 def link(refid):
     path = paths[refid]
-    relative = "" if path == current_page else path.name
+    relative = "" if path == current_page else path.relative_to(current_page.parent).as_posix()
     return f"{relative}#{anchors[refid]}"
 
 
@@ -86,15 +86,6 @@ def description(node, level=2):
     return "\n\n".join(filter(None, blocks))
 
 
-def usage_guide(content):
-    content = content.strip()
-    if not content:
-        return ""
-    return '??? abstract "Usage guide"\n\n' + "\n".join(
-        "    " + line if line else "" for line in content.splitlines()
-    )
-
-
 def template_prefix(node):
     templates = []
     for param in node.findall("templateparamlist/param"):
@@ -147,7 +138,12 @@ def type_markdown(compound, members):
     return "\n\n".join(filter(None, result))
 
 
-def main(xml_directory, output):
+def write_page(path, blocks):
+    body = "\n\n".join(filter(None, map(str.strip, blocks)))
+    path.write_text(body + "\n", encoding="utf-8")
+
+
+def main(xml_directory, output, index_page=None):
     global anchors, paths, current_page
     output = Path(output)
     xml_directory = Path(xml_directory)
@@ -219,32 +215,47 @@ def main(xml_directory, output):
             summary = " ".join(render(node.find("briefdescription")).split()).replace("|", "\\|")
             if kind == "function" and len(value) > 1:
                 summary += f" ({len(value)} overloads)"
-            rows.append(f'| <a id="{anchors[key]}"></a>[`{name}`]({link(key)}) | {summary} |')
+            anchor = f'<a id="{anchors[key]}"></a>' if current_page == output else ""
+            rows.append(f"| {anchor}[`{name}`]({link(key)}) | {summary} |")
         return "\n".join(rows)
 
-    def write(path, blocks):
-        body = "\n\n".join(filter(None, map(str.strip, blocks)))
-        path.write_text(body + "\n", encoding="utf-8")
-
     current_page = output
-    introduction, _, guide = description(mainpage).partition("\n\n")
+    introduction = description(mainpage).split("\n\n", 1)[0]
     blocks = [f"# {title} {{ #{title_anchor} }}", introduction,
               f'<a id="{anchors[namespace.get("id")]}"></a>', description(namespace)]
     for kind, heading in (("function", "Functions"), ("type", "Types")):
         content = [key for key, (entry_kind, _) in entries.items() if entry_kind == kind]
         if content:
             blocks.extend((f"## {heading}", overview(content)))
-    blocks.append(usage_guide(guide))
     output.parent.mkdir(parents=True, exist_ok=True)
-    write(output, blocks)
+    write_page(output, blocks)
     for key, (kind, value) in entries.items():
         current_page = paths[key]
         content = function_markdown(value) if kind == "function" else type_markdown(value, members[key])
-        write(current_page, [f"[{title}]({output.name})", content])
+        write_page(current_page, [content])
+
+    if index_page is not None:
+        current_page = index_page
+        relative = output.relative_to(index_page.parent).as_posix()
+        return f"## [{title}]({relative})", overview(entries)
+
+
+def render_all(xml_directory, output):
+    xml_directory = Path(xml_directory)
+    index_page = Path(output)
+    blocks = ["# C++ API"]
+    for section in ("capture", "replay"):
+        source = xml_directory / section / "xml"
+        page = index_page.parent / section / "index.md"
+        blocks.extend(main(source, page, index_page=index_page))
+    write_page(index_page, blocks)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("xml_directory")
     parser.add_argument("output")
-    main(**vars(parser.parse_args()))
+    parser.add_argument("--all-apis", action="store_true", help="Render Capture, Replay, and their shared index.")
+    args = parser.parse_args()
+    renderer = render_all if args.all_apis else main
+    renderer(args.xml_directory, args.output)

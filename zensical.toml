@@ -23,6 +23,7 @@ nav = [
     { "Benchmarking & auto-tuning" = "benchmarking.md" },
     { "Limitations" = "limitations.md" },
     { "C++ API" = [
+        "reference/index.md",
         { "Capture" = [
             "reference/capture/index.md",
             { "parallel_for" = "reference/capture/parallel_for.md" },
