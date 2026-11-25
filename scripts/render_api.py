@@ -58,8 +58,10 @@ def render(node, level=2):
             rows.append(marker + value)
         return "\n\n" + "\n".join(rows) + "\n\n"
 
+    section_title = node.find("title") if tag == "simplesect" else None
     content = (node.text or "") + "".join(
-        render(child, level) + (child.tail or "") for child in node
+        (render(child, level) if child is not section_title else "") + (child.tail or "")
+        for child in node
     )
     if tag == "ref":
         refid = node.get("refid")
@@ -73,7 +75,7 @@ def render(node, level=2):
     if tag == "simplesect":
         labels = {"pre": "Preconditions", "post": "Postconditions", "return": "Returns",
                   "note": "Note", "see": "See also", "warning": "Warning"}
-        label = labels.get(node.get("kind"), node.get("kind", "Note").title())
+        label = text(section_title) or labels.get(node.get("kind"), node.get("kind", "Note").title())
         return f"\n\n{'#' * level} {label}\n\n{content.strip()}\n\n"
     if tag == "para":
         return content.strip() + "\n\n"
@@ -105,10 +107,10 @@ def signature(node, owner=None):
     return template_prefix(node) + declaration + (" " + initializer if initializer else "") + ";"
 
 
-def function_markdown(overloads):
+def function_markdown(overloads, header):
     first = overloads[0]
     name = first.findtext("qualifiedname") or first.findtext("name")
-    result = [f"# `{name}` {{ #{anchors[first.get('id')]} }}"]
+    result = [f"# `{name}` {{ #{anchors[first.get('id')]} }}", header]
     for index, member in enumerate(overloads, 1):
         if len(overloads) > 1:
             result.append(f"## Overload {index} {{ #overload-{index} }}")
@@ -121,7 +123,7 @@ def function_markdown(overloads):
     return "\n\n".join(filter(None, result))
 
 
-def type_markdown(compound, members):
+def type_markdown(compound, members, header):
     name = compound.findtext("compoundname")
     kind = compound.get("kind")
     declaration = template_prefix(compound) + f"{kind} {name} {{\n"
@@ -129,7 +131,7 @@ def type_markdown(compound, members):
         declaration += " public:\n"
     declaration += "\n".join("  " + signature(member, name).replace("\n", "\n  ")
                              for member in members) + "\n};"
-    result = [f"# `{name}` {{ #{anchors[compound.get('id')]} }}",
+    result = [f"# `{name}` {{ #{anchors[compound.get('id')]} }}", header,
               description(compound), "## Interface", f"```cpp\n{declaration}\n```",
               "## Members"]
     for member in members:
@@ -156,6 +158,9 @@ def main(xml_directory, output, index_page=None):
 
     namespace = read_compound("namespacekrepe")
     mainpage = read_compound("indexpage")
+    headers = map(literal, mainpage.findall("detaileddescription/para/computeroutput"))
+    include = next((value for value in headers if re.fullmatch(r"<krepe/[^>]+\.hpp>", value)), "")
+    header = f"**Header file** `{include}`" if include else ""
     compounds = [namespace]
     for compound in compounds:
         for child in compound.findall("innerclass[@prot='public']"):
@@ -231,7 +236,8 @@ def main(xml_directory, output, index_page=None):
     write_page(output, blocks)
     for key, (kind, value) in entries.items():
         current_page = paths[key]
-        content = function_markdown(value) if kind == "function" else type_markdown(value, members[key])
+        content = (function_markdown(value, header) if kind == "function"
+                   else type_markdown(value, members[key], header))
         write_page(current_page, [content])
 
     if index_page is not None:

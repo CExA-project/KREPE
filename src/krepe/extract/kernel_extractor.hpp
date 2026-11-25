@@ -216,7 +216,32 @@ Functor replay_functor(Functor&& functor) {
 }
 
 /**
- * @brief Calls a parallel_for and saves the execution policy and the functor.
+ * @brief Calls `Kokkos::parallel_for` with optional capture for replay.
+ *
+ * For the selected invocation, the capture tool saves the execution policy,
+ * functor state, and snapshots of tracked allocations taken before and after
+ * the kernel runs. The `--krepe-kernel-invocation` option selects a one-based
+ * invocation number for the label and defaults to 1.
+ *
+ * With the capture tool loaded, set `--krepe-kernel-label=scale` to capture
+ * the first launch with that label.
+ *
+ * @code{.cpp}
+ * constexpr int count = 8;
+ * Kokkos::View<int*> values("values", count);
+ * Kokkos::deep_copy(values, 1);
+ * krepe::parallel_for(
+ *     "scale", Kokkos::RangePolicy<>(0, count),
+ *     KOKKOS_LAMBDA(int i) { values(i) *= 2; });
+ * @endcode
+ *
+ * @param label Kernel label passed to Kokkos and matched against the value
+ * of `--krepe-kernel-label`.
+ * @param policy Iteration count, `Kokkos::RangePolicy`, `Kokkos::MDRangePolicy`
+ * or `Kokkos::TeamPolicy`.
+ * @param functor Kernel functor or lambda accepted by `Kokkos::parallel_for`.
+ * @pre Kokkos must be initialized. For capture, load the KREPE tool before the
+ * first call to a capture API function.
  */
 template <class Policy, class Functor>
 void parallel_for(const std::string& label, const Policy& policy,
