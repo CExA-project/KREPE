@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: MIT
+# SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+@INCLUDE                = docs/doxygen/common.doxyfile
+
+PROJECT_NAME            = "KREPE replay API"
+PROJECT_BRIEF           = "Public API provided by <krepe/replayer.hpp>"
+OUTPUT_DIRECTORY        = build-docs/doxygen/replay
+INPUT                   = docs/doxygen/replay.dox \
+                          src/krepe/replayer.hpp \
+                          src/krepe/replay/kernel_replayer.hpp

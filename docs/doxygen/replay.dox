@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+/**
+ * @mainpage Replay API
+ *
+ * Include `<krepe/replayer.hpp>` and link with `KREPE::replayer` and
+ * `Kokkos::kokkos` to use the replay API.
+ */

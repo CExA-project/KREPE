@@ -688,16 +688,40 @@ impl::ForcePolicy<Policy> force_policy(Policy&& policy) {
 }
 
 /**
- * @brief Replays a parallel_for using the execution policy and functors stored
- * in a replay dump.
+ * @brief Replays a kernel using the functor state from the dump.
  *
- * @param label A label forwarded to the underlying Kokkos::parallel_for
- * @param p The policy to use, if it is `force_policy(other_policy)` then
- * `other_policy` will be used, otherwise this parameter will be ignored and the
- * policy stored in the replay dump will be used
- * @param functor A functor with the same signature and the same captures as the
- * functor to replay, its operator() will be used but its data will be replaced
- * by the one stored in the replay dump
+ * Restores the captured state into a copy of the functor. The launch may be
+ * asynchronous, so keep the replay active until the kernel completes.
+ *
+ * Replay reconstructs an untagged policy from the dump. If the functor
+ * requires a `WorkTag`, pass a temporary tagged policy to `force_policy()`.
+ *
+ * @param label Label for the replay launch, passed to `Kokkos::parallel_for`.
+ * @param p A placeholder such as `0` to use the recorded policy, or
+ * `force_policy(Kokkos::RangePolicy<>(0, 8))` to override it with a temporary
+ * policy. Every unwrapped argument is ignored, including Kokkos policies.
+ * @param functor Copy-constructible kernel functor with the captured binary
+ * layout.
+ * @pre Kokkos is initialized and a replay is active. Loading the dump
+ * requires support for any recorded policy and its execution space.
+ * @throws std::runtime_error If restoring the functor fails or if the
+ * recorded policy is requested and missing from the dump.
+ *
+ * @par Examples
+ * Run the replay program with the dump path reported during capture. For
+ * example, run `./replay_prog --krepe-dump-file=krepe_scale_3.h5`. The program
+ * constructs a `krepe::ScopeGuard` from `argc` and `argv` before initializing
+ * Kokkos.
+ *
+ * This launch uses `0` as a placeholder for the recorded policy. Replay
+ * restores the view captured by the lambda.
+ *
+ * @code{.cpp}
+ * Kokkos::View<int*> values;
+ * krepe::parallel_for(
+ *     "scale", 0, KOKKOS_LAMBDA(int i) { values(i) *= 2; });
+ * Kokkos::fence();
+ * @endcode
  */
 template <class Policy, class Functor>
 void parallel_for(const std::string& label, [[maybe_unused]] const Policy& p,

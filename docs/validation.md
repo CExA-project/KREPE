@@ -33,8 +33,9 @@ krepe::compare_views<int*>(
     });
 ```
 
-If several allocations share the same label, use [krepe::get_allocations](api.md#krepeget_allocations)
-and pass each descriptor to [krepe::compare_views](api.md#krepecompare_views).
+If several allocations share the same label, use
+[krepe::get_allocations](reference/replay/get_allocations.md) and pass each
+descriptor to [krepe::compare_views](reference/replay/compare_views.md).
 
 ## Access the reference output
 

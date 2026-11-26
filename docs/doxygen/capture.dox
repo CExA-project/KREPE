@@ -1,0 +1,9 @@
+// SPDX-License-Identifier: MIT
+// SPDX-FileCopyrightText: Copyright Contributors to the KREPE project
+
+/**
+ * @mainpage Capture API
+ *
+ * Include `<krepe/extractor.hpp>` and link with `KREPE::extractor` to use the
+ * capture API.
+ */
