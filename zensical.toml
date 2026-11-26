@@ -52,4 +52,4 @@ nav = [
 ]
 
 [project.theme]
-features = ["navigation.indexes"]
+features = ["navigation.indexes", "navigation.expand"]
